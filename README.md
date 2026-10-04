@@ -48,6 +48,8 @@ EasyWAM is a unified research codebase designed to make World Action Model devel
 - **EasyWAM-MoT-IDM.** A dual-backbone model that uses teacher-forced conditional video for action prediction.
 - **EasyWAM-Hidden.** A dual-backbone architecture that uses intermediate Video DiT features as conditional input to a separate Action DiT. The architecture is based on [DiT4DiT](https://github.com/Mondo-Robotics/DiT4DiT).
 
+[FastWAM, FastWAM-Joint and FastWAM-IDM recipes](docs/instructions/config/fastwam.md) also retain the original linear projections while using EasyWAM training and inference. Their text padding uses EasyWAM's valid-token masks.
+
 | Model | Full-Parameter Training | LoRA Fine-Tuning |
 | --- | :---: | :---: |
 | EasyWAM-Unified | ✅ | ✅ |

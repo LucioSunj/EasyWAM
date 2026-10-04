@@ -34,6 +34,7 @@ class EasyWAMMoT(torch.nn.Module):
     """MoT world model with video/action experts."""
 
     model_variant = "mot"
+    action_expert_cls = ActionDiT
 
     inference_compile_targets = (
         "_predict_video_noise",
@@ -89,15 +90,7 @@ class EasyWAMMoT(torch.nn.Module):
                 if self.state_position == "context"
                 else int(self.action_expert.hidden_dim)
             )
-            if getattr(video_expert, "block_protocol", "main") == "flux2":
-                # ImageWAM FLUX.2 checkpoints used a single linear proprio token.
-                self.state_encoder = nn.Linear(self.state_dim, state_output_dim).to(torch_dtype)
-            else:
-                self.state_encoder = StateEncoder(
-                    state_dim=self.state_dim,
-                    hidden_dim=state_output_dim,
-                    projector_hidden_dim=self.projector_hidden_dim,
-                ).to(torch_dtype)
+            self.state_encoder = self._build_state_encoder(state_output_dim).to(torch_dtype)
         else:
             self.state_encoder = None
 
@@ -132,6 +125,16 @@ class EasyWAMMoT(torch.nn.Module):
     def video_dit(self):
         return self.video_expert
 
+    def _build_state_encoder(self, output_dim: int) -> nn.Module:
+        if getattr(self.video_expert, "block_protocol", "main") == "flux2":
+            # ImageWAM FLUX.2 checkpoints used a single linear proprio token.
+            return nn.Linear(self.state_dim, output_dim)
+        return StateEncoder(
+            state_dim=self.state_dim,
+            hidden_dim=output_dim,
+            projector_hidden_dim=self.projector_hidden_dim,
+        )
+
     @classmethod
     def from_backbone_pretrained(
         cls,
@@ -165,7 +168,7 @@ class EasyWAMMoT(torch.nn.Module):
             skip_dit_load_from_pretrain=skip_dit_load_from_pretrain,
         )
         video_expert = components.dit
-        action_expert_cls = ActionDiT
+        action_expert_cls = cls.action_expert_cls
         if components.block_protocol == "flux2":
             from .component.action_dit_flux2 import ActionDiTFlux2
 
@@ -286,7 +289,7 @@ class EasyWAMMoT(torch.nn.Module):
         )
 
         video_expert = components.dit
-        action_expert = ActionDiT.from_pretrained(
+        action_expert = cls.action_expert_cls.from_pretrained(
             action_dit_config=action_dit_config,
             action_dit_pretrained_path=action_dit_pretrained_path,
             skip_dit_load_from_pretrain=skip_dit_load_from_pretrain,

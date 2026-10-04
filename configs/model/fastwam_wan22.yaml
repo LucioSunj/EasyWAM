@@ -1,0 +1,8 @@
+defaults:
+  - easywam_mot_wan22
+  - _self_
+
+_target_: runtime.create_fastwam
+# Retain FastWAM's linear projections and state token in the text context.
+# Padding follows EasyWAM: padded text tokens are masked in attention.
+state_position: context

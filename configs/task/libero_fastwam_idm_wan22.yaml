@@ -1,0 +1,6 @@
+# @package _global_
+
+defaults:
+  - libero_easywam_mot_idm_wan22
+  - override /model: fastwam_idm_wan22
+  - _self_

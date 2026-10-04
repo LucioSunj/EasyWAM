@@ -4,6 +4,8 @@
 
 Model recipes live in `configs/model/`. Their names follow `easywam_<architecture>_<backbone>[_lora]`. Task recipes select one of these models and provide the data dimensions referenced by the model config.
 
+The separate [FastWAM recipes](fastwam.md) retain original FastWAM linear projections and use EasyWAM's masked text padding, training and batched inference.
+
 ## Select an architecture
 
 | Architecture | Configuration-specific behavior | Architecture-specific settings |

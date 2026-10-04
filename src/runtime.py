@@ -269,6 +269,27 @@ def create_easywam_mot_idm(*args, **kwargs):
     return _create_easywam_mot(EasyWAMMoTIDM, *args, **kwargs)
 
 
+def create_fastwam(*args, **kwargs):
+    """Create FastWAM with EasyWAM execution and text-padding semantics."""
+    from model.fastwam import FastWAM
+
+    return _create_easywam_mot(FastWAM, *args, **kwargs)
+
+
+def create_fastwam_joint(*args, **kwargs):
+    """Create FastWAM-Joint with EasyWAM execution and text-padding semantics."""
+    from model.fastwam import FastWAMJoint
+
+    return _create_easywam_mot(FastWAMJoint, *args, **kwargs)
+
+
+def create_fastwam_idm(*args, **kwargs):
+    """Create FastWAM-IDM with EasyWAM execution and text-padding semantics."""
+    from model.fastwam import FastWAMIDM
+
+    return _create_easywam_mot(FastWAMIDM, *args, **kwargs)
+
+
 def create_easywam_unified(
     model_id: str | None = None,
     tokenizer_model_id: str | None = None,

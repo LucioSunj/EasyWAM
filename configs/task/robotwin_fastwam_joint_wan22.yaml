@@ -1,0 +1,6 @@
+# @package _global_
+
+defaults:
+  - robotwin_easywam_mot_joint_wan22
+  - override /model: fastwam_joint_wan22
+  - _self_

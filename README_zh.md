@@ -48,6 +48,8 @@ EasyWAM 是一个统一的 World Action Model 研究代码库，旨在让模型�
 - **EasyWAM-MoT-IDM：** 采用双主干架构，使用 teacher-forcing 条件视频进行动作预测。
 - **EasyWAM-Hidden：** 采用双主干架构，将 Video DiT 的中间特征作为独立 Action DiT 的条件输入。该架构参考 [DiT4DiT](https://github.com/Mondo-Robotics/DiT4DiT)。
 
+另提供 [FastWAM、FastWAM-Joint 与 FastWAM-IDM 配方](docs/instructions/config/fastwam_zh.md)，保留原版线性投影并使用 EasyWAM 的训练和推理基础设施。文本 padding 采用 EasyWAM 的有效 token mask。
+
 | 模型 | 全参数训练 | LoRA 微调 |
 | --- | :---: | :---: |
 | EasyWAM-Unified | ✅ | ✅ |

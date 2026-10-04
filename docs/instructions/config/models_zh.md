@@ -1,5 +1,7 @@
 # 模型配置
 
+[FastWAM 配方](fastwam_zh.md)保留原版线性投影，并使用 EasyWAM 的文本 padding 屏蔽、训练与批量推理。
+
 [English](models.md) | [配置索引](README_zh.md) | [返回 README](../../../README_zh.md)
 
 模型 recipe 位于 `configs/model/`，命名形式为 `easywam_<architecture>_<backbone>[_lora]`。task recipe 会选择其中一个模型，并提供模型配置引用的数据维度。

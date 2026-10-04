@@ -1,0 +1,5 @@
+defaults:
+  - fastwam_wan22
+  - _self_
+
+_target_: runtime.create_fastwam_joint

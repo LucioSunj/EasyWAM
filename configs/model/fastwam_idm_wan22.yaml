@@ -1,0 +1,6 @@
+defaults:
+  - fastwam_wan22
+  - _self_
+
+_target_: runtime.create_fastwam_idm
+video_cond_noise_prob: 0.5

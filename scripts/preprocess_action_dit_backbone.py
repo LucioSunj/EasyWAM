@@ -4,10 +4,11 @@ from typing import Any
 
 import torch
 import torch.nn.functional as F
+from hydra import compose, initialize_config_dir
 from omegaconf import OmegaConf
 
-from model.component.action_dit import ActionDiT
 from model.backbone.loader import load_easywam_backbone
+from model.component.action_dit import ActionDiT
 
 
 def _parse_dtype(name: str) -> torch.dtype:
@@ -91,29 +92,22 @@ def _resize_tensor_to_shape(src: torch.Tensor, target_shape: tuple[int, ...]) ->
 
 
 def _load_model_config(path: Path, backbone_name: str) -> tuple[dict[str, Any], dict[str, Any]]:
-    cfg = OmegaConf.load(str(path))
+    with initialize_config_dir(
+        config_dir=str(path.resolve().parent.parent), version_base="1.3"
+    ):
+        root = compose(
+            config_name=None,
+            overrides=[f"+model={path.stem}", f"model/backbone={backbone_name}"],
+        )
+    cfg = root.model
     if "action_dit_config" not in cfg:
         raise ValueError(f"`{path}` must contain `action_dit_config`.")
-    backbone_path = path.parent / "backbone" / f"{backbone_name}.yaml"
-    if not backbone_path.is_file():
-        raise FileNotFoundError(f"Backbone config not found: {backbone_path}")
-    backbone_cfg = OmegaConf.to_container(OmegaConf.load(backbone_path), resolve=False)
     action_cfg = OmegaConf.to_container(cfg.action_dit_config, resolve=False)
-    if not isinstance(backbone_cfg, dict) or not isinstance(action_cfg, dict):
-        raise ValueError("Backbone and ActionDiT configs must resolve to dictionaries.")
-    if isinstance(backbone_cfg.get("dit_config"), dict):
-        backbone_cfg["dit_config"]["attention_backend"] = backbone_cfg.get(
-            "attention_backend", "sdpa"
-        )
-
     if _is_unresolved_interpolation(action_cfg.get("action_dim")):
         print("[WARN] `action_dit_config.action_dim` is unresolved; defaulting to 7 for preprocessing.")
-        action_cfg["action_dim"] = 7
-
-    for key in ["num_heads", "attn_head_dim", "num_layers", "text_dim", "freq_dim"]:
-        action_cfg[key] = backbone_cfg[key]
-    action_cfg["attention_backend"] = backbone_cfg.get("attention_backend", "sdpa")
-
+        cfg.action_dit_config.action_dim = 7
+    backbone_cfg = OmegaConf.to_container(cfg.backbone, resolve=True)
+    action_cfg = OmegaConf.to_container(cfg.action_dit_config, resolve=True)
     return backbone_cfg, action_cfg
 
 
