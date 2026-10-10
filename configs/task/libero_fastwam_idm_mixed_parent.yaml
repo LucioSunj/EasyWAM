@@ -1,0 +1,15 @@
+# @package _global_
+# Keep the existing LIBERO v2.1 corpus when changing the supervised trainer.
+defaults:
+  - libero_fastwam_idm_wan22
+  - _self_
+
+data:
+  train:
+    dataset_dirs:
+      - ${oc.env:FASTWAM_LIBERO_DATA_ROOT}/libero_spatial_no_noops_lerobot
+      - ${oc.env:FASTWAM_LIBERO_DATA_ROOT}/libero_object_no_noops_lerobot
+      - ${oc.env:FASTWAM_LIBERO_DATA_ROOT}/libero_goal_no_noops_lerobot
+      - ${oc.env:FASTWAM_LIBERO_DATA_ROOT}/libero_10_no_noops_lerobot
+    text_embedding_cache_dir: ${oc.env:FASTWAM_EASYWAM_TEXT_CACHE}
+    pretrained_norm_stats: ${oc.env:FASTWAM_DATASET_STATS,null}

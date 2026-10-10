@@ -90,12 +90,21 @@ class _FastWAMArchitecture:
 
         payload = torch.load(path, map_location="cpu", mmap=True)
         validate_checkpoint_state_position(payload, self.state_position)
+        original_state_schema = (
+            "proprio_encoder" in payload and "state_encoder" not in payload
+        )
         for key, expected in (
             ("backbone_name", "wan22"),
             ("model_variant", self.model_variant),
             ("text_padding", "masked"),
         ):
             if key in payload and payload[key] != expected:
+                if (
+                    key == "text_padding"
+                    and payload[key] == "legacy_visible"
+                    and original_state_schema
+                ):
+                    continue
                 raise ValueError(
                     f"Checkpoint {key}={payload[key]!r}; expected {expected!r}."
                 )

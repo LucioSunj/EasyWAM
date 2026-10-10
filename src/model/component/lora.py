@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 import torch.nn as nn
 from omegaconf import DictConfig, OmegaConf
-from peft import LoraConfig, inject_adapter_in_model
-from peft.tuners.lora.layer import LoraLayer
 
 from utils.logging_config import get_logger
+
+if TYPE_CHECKING:
+    from peft import LoraConfig
 
 
 logger = get_logger(__name__)
@@ -19,6 +20,8 @@ LORA_CHECKPOINT_FORMAT = "trainable_lora"
 
 
 def _normalize_lora_config(config: Any) -> LoraConfig:
+    from peft import LoraConfig
+
     if isinstance(config, LoraConfig):
         return config
     if isinstance(config, DictConfig):
@@ -34,6 +37,13 @@ def _normalize_lora_config(config: Any) -> LoraConfig:
 
 def iter_lora_layers(module: nn.Module):
     for name, child in module.named_modules():
+        # Dense models use this helper for training and checkpoint I/O too.
+        # Only PEFT layers have both adapter containers; defer its dependency
+        # until there is an adapter to inspect.
+        if not (hasattr(child, "lora_A") and hasattr(child, "lora_B")):
+            continue
+        from peft.tuners.lora.layer import LoraLayer
+
         if isinstance(child, LoraLayer):
             yield name, child
 
@@ -43,6 +53,8 @@ def has_lora(module: nn.Module) -> bool:
 
 
 def inject_video_dit_lora(video_dit: nn.Module, config: Any) -> LoraConfig:
+    from peft import inject_adapter_in_model
+
     if has_lora(video_dit):
         raise ValueError("Video DiT already contains LoRA layers.")
 
