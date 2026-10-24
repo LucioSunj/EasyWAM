@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Sequence
 
 import torch
 import torch.nn as nn
@@ -31,6 +31,7 @@ class MoT(nn.Module):
     def __init__(
         self,
         mixtures: Dict[str, nn.Module],
+        gradient_checkpointing_layers: Optional[Sequence[int]] = None,
     ):
         super().__init__()
         if not mixtures:
@@ -46,6 +47,17 @@ class MoT(nn.Module):
         if self.block_protocol not in SUPPORTED_BLOCK_PROTOCOLS:
             raise ValueError(f"Unsupported MoT block protocol: {self.block_protocol!r}")
         self.num_layers = len(first_expert.blocks)
+        if gradient_checkpointing_layers is None:
+            self.gradient_checkpointing_layers = None
+        else:
+            indices = list(gradient_checkpointing_layers)
+            if any(type(index) is not int or not 0 <= index < self.num_layers for index in indices):
+                raise ValueError("Gradient checkpointing layer indices must be integers within the model depth.")
+            if len(set(indices)) != len(indices):
+                raise ValueError("Gradient checkpointing layer indices must be unique.")
+            if self.block_protocol != BLOCK_PROTOCOL_MAIN:
+                raise ValueError("Selective gradient checkpointing is only supported for the main block protocol.")
+            self.gradient_checkpointing_layers = frozenset(indices)
         self.num_heads = first_expert.num_heads
         self.attn_head_dim = first_expert.attn_head_dim
         self.attention_backend = normalize_attention_backend(first_expert.attention_backend)
@@ -534,10 +546,12 @@ class MoT(nn.Module):
                 t_mod_all=t_mod_all,
             )
 
-        if attention_mask.ndim != 2:
-            raise ValueError(f"`attention_mask` must be 2D [S, S], got shape {tuple(attention_mask.shape)}")
-        if attention_mask.shape[0] != attention_mask.shape[1]:
+        if attention_mask.ndim not in (2, 3):
+            raise ValueError(f"`attention_mask` must be [S,S] or [B,S,S], got {tuple(attention_mask.shape)}")
+        if attention_mask.shape[-2] != attention_mask.shape[-1]:
             raise ValueError(f"`attention_mask` must be square, got shape {tuple(attention_mask.shape)}")
+        if attention_mask.ndim == 3 and attention_mask.shape[0] != next(iter(embeds_all.values())).shape[0]:
+            raise ValueError("Attention mask batch size does not match token embeddings.")
 
         tokens_all = {k: v for k, v in embeds_all.items()}
         use_gradient_checkpointing = any(
@@ -569,10 +583,10 @@ class MoT(nn.Module):
                 q_cat = torch.cat(q_chunks, dim=1)
                 k_cat = torch.cat(k_chunks, dim=1)
                 v_cat = torch.cat(v_chunks, dim=1)
-                if attention_mask.shape[0] != q_cat.shape[1]:
+                if attention_mask.shape[-1] != q_cat.shape[1]:
                     raise ValueError(
                         "Attention mask seq length mismatch: "
-                        f"mask={attention_mask.shape[0]} vs tokens={q_cat.shape[1]}"
+                        f"mask={attention_mask.shape[-1]} vs tokens={q_cat.shape[1]}"
                     )
                 mixed = self._mixed_attention(q_cat, k_cat, v_cat, attention_mask)
                 outputs = []
@@ -596,7 +610,9 @@ class MoT(nn.Module):
                 return tuple(outputs)
 
             inputs = tuple(tokens_all[name] for name in self.expert_order)
-            if use_gradient_checkpointing and torch.is_grad_enabled():
+            if (use_gradient_checkpointing and torch.is_grad_enabled()
+                    and (self.gradient_checkpointing_layers is None
+                         or layer_idx in self.gradient_checkpointing_layers)):
                 outputs = torch.utils.checkpoint.checkpoint(
                     _layer_forward, *inputs, use_reentrant=False
                 )

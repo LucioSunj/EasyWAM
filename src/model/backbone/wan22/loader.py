@@ -1,9 +1,12 @@
-from dataclasses import dataclass
 import inspect
+import time
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import torch
-import time
+
+from utils.logging_config import get_logger
 
 from ...helpers.io import LocalModelFile, hash_model_file, load_state_dict
 from ...helpers.state_dict_converters import (
@@ -12,7 +15,6 @@ from ...helpers.state_dict_converters import (
 from .wan_video_dit import WanVideoDiT
 from .wan_video_text_encoder import HuggingfaceTokenizer, WanTextEncoder
 from .wan_video_vae import WanVideoVAE38
-from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 SKIPPED_PRETRAIN_SENTINEL = "SKIPPED_PRETRAIN"
@@ -122,10 +124,22 @@ def _load_registered_model(
     return model
 
 
-def _resolve_configs(model_id: str, tokenizer_model_id: str):
-    dit_config = LocalModelFile(model_id, "diffusion_pytorch_model*.safetensors")
-    text_config = LocalModelFile(model_id, "models_t5_umt5-xxl-enc-bf16.pth")
-    vae_config = LocalModelFile(model_id, "Wan2.2_VAE.pth")
+def _resolve_configs(
+    model_id: str,
+    tokenizer_model_id: str,
+    dit_path: str | None = None,
+    text_encoder_path: str | None = None,
+    vae_path: str | None = None,
+):
+    def asset_file(path: str | None, default_pattern: str) -> LocalModelFile:
+        if path is None:
+            return LocalModelFile(model_id, default_pattern)
+        file_path = Path(path).expanduser()
+        return LocalModelFile(str(file_path.parent), file_path.name)
+
+    dit_config = asset_file(dit_path, "diffusion_pytorch_model*.safetensors")
+    text_config = asset_file(text_encoder_path, "models_t5_umt5-xxl-enc-bf16.pth")
+    vae_config = asset_file(vae_path, "Wan2.2_VAE.pth")
     tokenizer_config = LocalModelFile(tokenizer_model_id, "./")
     return dit_config, text_config, vae_config, tokenizer_config
 
@@ -139,6 +153,9 @@ def load_wan22_ti2v_5b_components(
     dit_config: dict[str, Any] | None = None,
     skip_dit_load_from_pretrain: bool = False,
     load_text_encoder: bool = True,
+    dit_path: str | None = None,
+    text_encoder_path: str | None = None,
+    vae_path: str | None = None,
 ):
     logger.info("Loading Wan2.2-TI2V-5B components...")
     start = time.time()
@@ -150,6 +167,9 @@ def load_wan22_ti2v_5b_components(
     dit_model_config, text_config, vae_config, tokenizer_config = _resolve_configs(
         model_id=model_id,
         tokenizer_model_id=tokenizer_model_id,
+        dit_path=dit_path,
+        text_encoder_path=text_encoder_path,
+        vae_path=vae_path,
     )
 
     vae_config.resolve()
@@ -162,11 +182,15 @@ def load_wan22_ti2v_5b_components(
             "Skipping pretrained video DiT load (`skip_dit_load_from_pretrain=True`); "
             "initializing video expert randomly and expecting checkpoint override."
         )
-        dit: WanVideoDiT = WanVideoDiT(**validated_dit_config).to(device=device, dtype=torch_dtype)
+        dit: WanVideoDiT = WanVideoDiT(**validated_dit_config).to(
+            device=device, dtype=torch_dtype
+        )
         dit_path = SKIPPED_PRETRAIN_SENTINEL
     else:
         dit_model_config.resolve()
-        logger.info("Loading pretrained Wan2.2 video DiT from %s", dit_model_config.path)
+        logger.info(
+            "Loading pretrained Wan2.2 video DiT from %s", dit_model_config.path
+        )
         dit = _load_registered_model(
             dit_model_config.path,
             "wan_video_dit",
@@ -213,7 +237,10 @@ def load_wan22_ti2v_5b_components(
         device=device,
     )
     logger.info("Finished loading Wan2.2 video VAE.")
-    logger.info("Finished loading Wan2.2-TI2V-5B components in %.2f seconds.", time.time() - start)
+    logger.info(
+        "Finished loading Wan2.2-TI2V-5B components in %.2f seconds.",
+        time.time() - start,
+    )
     return Wan22LoadedComponents(
         dit=dit,
         vae=vae,

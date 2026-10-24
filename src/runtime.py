@@ -541,12 +541,21 @@ def build_datasets(data_cfg: DictConfig):
 
 def run_training(cfg: DictConfig):
     from accelerate import Accelerator
+    from accelerate.utils import set_seed
     from trainer import EasyWAMTrainer
     from utils import misc
 
     mixed_precision = _normalize_mixed_precision(cfg.mixed_precision)
+    accumulation_kwargs = {"gradient_accumulation_steps": int(cfg.gradient_accumulation_steps)}
+    if not cfg.get("gradient_accumulation_sync_with_dataloader", True):
+        from accelerate.utils import GradientAccumulationPlugin
+
+        # Step-based runs may need full global batches across short dataset epochs.
+        accumulation_kwargs = {"gradient_accumulation_plugin": GradientAccumulationPlugin(
+            num_steps=int(cfg.gradient_accumulation_steps), sync_with_dataloader=False
+        )}
     accelerator = Accelerator(
-        gradient_accumulation_steps=int(cfg.gradient_accumulation_steps),
+        **accumulation_kwargs,
         mixed_precision=mixed_precision,
         step_scheduler_with_optimizer=False,
     )
@@ -561,6 +570,9 @@ def run_training(cfg: DictConfig):
             OmegaConf.save(config_payload, f)
 
     model_dtype = _mixed_precision_to_model_dtype(mixed_precision)
+    # Initialize fresh action/state projections from the configured seed on all
+    # ranks; the trainer separately seeds rank-specific training randomness.
+    set_seed(int(cfg.seed))
     model = instantiate(cfg.model, model_dtype=model_dtype, device=str(accelerator.device))
     from model.helpers.inference import configure_model_execution
     model = configure_model_execution(

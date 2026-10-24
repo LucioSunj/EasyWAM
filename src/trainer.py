@@ -70,6 +70,12 @@ def _forward_training_model(model, sample):
     return loss, metrics
 
 
+def _training_accumulation_context(accelerator, model, *, is_deepspeed):
+    # DeepSpeed owns gradient reduction; its step() must not run inside no_sync().
+    models = () if is_deepspeed else (model,)
+    return accelerator.accumulate(*models)
+
+
 class EasyWAMTrainer:
     def __init__(self, model, train_dataset, val_dataset=None, *, cfg: DictConfig, accelerator: Accelerator):
         self.model = model
@@ -106,6 +112,15 @@ class EasyWAMTrainer:
             raise ValueError(
                 "`checkpoint_save_limit` must be null or > 0, "
                 f"got {self.checkpoint_save_limit}."
+            )
+        state_checkpoint_save_limit = cfg.get("state_checkpoint_save_limit", checkpoint_save_limit)
+        self.state_checkpoint_save_limit = (
+            None if state_checkpoint_save_limit is None else int(state_checkpoint_save_limit)
+        )
+        if self.state_checkpoint_save_limit is not None and self.state_checkpoint_save_limit <= 0:
+            raise ValueError(
+                "`state_checkpoint_save_limit` must be null or > 0, "
+                f"got {self.state_checkpoint_save_limit}."
             )
         self.eval_every = int(cfg.eval_every)
         self.eval_num_inference_steps = int(cfg.eval_num_inference_steps)
@@ -801,9 +816,19 @@ class EasyWAMTrainer:
             "global_step": int(self.global_step),
             "epoch": int(self.epoch),
             "batch_in_epoch": int(self.batch_in_epoch),
+            "batch_size": int(self.batch_size),
+            "num_processes": int(self.accelerator.num_processes),
+            "gradient_accumulation_steps": int(self.accelerator.gradient_accumulation_steps),
         }
-        with open(state_file, "w", encoding="utf-8") as f:
+        if getattr(self, "is_deepspeed", False):
+            engine = self.accelerator.deepspeed_engine_wrapped.engine
+            if int(engine.global_steps) != self.global_step:
+                raise ValueError("Cannot save inconsistent trainer and DeepSpeed optimizer steps.")
+            payload["deepspeed_global_step"] = int(engine.global_steps)
+        temporary_file = f"{state_file}.tmp"
+        with open(temporary_file, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=True, indent=2)
+        os.replace(temporary_file, state_file)
 
     @staticmethod
     def _prune_step_artifacts(directory: str, max_to_keep: int, *, suffix: str = ""):
@@ -829,17 +854,17 @@ class EasyWAMTrainer:
             logger.info("[ckpt] removed old artifact: %s", path)
 
     def _prune_saved_checkpoints(self):
-        if self.checkpoint_save_limit is None:
-            return
-        self._prune_step_artifacts(
-            self.weights_dir,
-            self.checkpoint_save_limit,
-            suffix=".pt",
-        )
-        self._prune_step_artifacts(
-            self.state_dir,
-            self.checkpoint_save_limit,
-        )
+        if self.checkpoint_save_limit is not None:
+            self._prune_step_artifacts(
+                self.weights_dir,
+                self.checkpoint_save_limit,
+                suffix=".pt",
+            )
+        if self.state_checkpoint_save_limit is not None:
+            self._prune_step_artifacts(
+                self.state_dir,
+                self.state_checkpoint_save_limit,
+            )
 
     def save_checkpoint(self):
         step_tag = f"step_{self.global_step:06d}"
@@ -856,6 +881,8 @@ class EasyWAMTrainer:
         if self.accelerator.is_main_process:
             logger.info("[ckpt] saving distributed state: %s", state_path)
         self.accelerator.save_state(output_dir=state_path)
+        # Publish progress only after every rank has finished its state shard.
+        self.accelerator.wait_for_everyone()
         if self.accelerator.is_main_process:
             self._save_trainer_state(state_path)
             logger.info(
@@ -872,8 +899,37 @@ class EasyWAMTrainer:
         return {"weights_path": ckpt_path, "state_path": state_path}
 
     def load_training_state(self, state_dir: str):
-        self.accelerator.load_state(input_dir=state_dir)
         state_file = Path(state_dir) / "trainer_state.json"
+        if not state_file.is_file():
+            raise ValueError(
+                f"Incomplete training state: missing {state_file}. "
+                "Use the newest complete state, or explicitly load a weight checkpoint."
+            )
+        if state_file.exists():
+            with open(state_file, "r", encoding="utf-8") as f:
+                saved_progress = json.load(f)
+            required_progress = {"global_step", "epoch", "batch_in_epoch"}
+            if not required_progress.issubset(saved_progress):
+                raise ValueError(
+                    f"Incomplete training state: missing progress fields "
+                    f"{sorted(required_progress - set(saved_progress))}."
+                )
+            expected = {
+                "batch_size": int(self.batch_size),
+                "num_processes": int(self.accelerator.num_processes),
+                "gradient_accumulation_steps": int(self.accelerator.gradient_accumulation_steps),
+            }
+            for name, value in expected.items():
+                if name in saved_progress and int(saved_progress[name]) != value:
+                    raise ValueError(f"Cannot resume with changed {name}: {saved_progress[name]} != {value}.")
+        self.accelerator.load_state(input_dir=state_dir)
+        if getattr(self, "is_deepspeed", False):
+            engine = self.accelerator.deepspeed_engine_wrapped.engine
+            if int(engine.global_steps) != int(saved_progress["global_step"]):
+                raise ValueError(
+                    "Cannot resume inconsistent trainer and DeepSpeed optimizer steps: "
+                    f"{saved_progress['global_step']} != {engine.global_steps}."
+                )
         if state_file.exists():
             with open(state_file, "r", encoding="utf-8") as f:
                 payload = json.load(f)
@@ -1020,6 +1076,16 @@ class EasyWAMTrainer:
             raise ValueError("`max_steps` must be set before entering the while-step training loop.")
 
         logger.info("Starting training with max_steps=%d.", self.max_steps)
+        self.train_sampler.set_absolute_epoch(self.epoch)
+        if self.batch_in_epoch > 0 and len(self.train_sampler) == 0:
+            global_micro_batch = self.batch_size * self.accelerator.num_processes
+            full_epoch_batches = (len(self.train_dataset) + global_micro_batch - 1) // global_micro_batch
+            if self.batch_in_epoch != full_epoch_batches:
+                raise ValueError("Resume batch offset exceeds the epoch length.")
+            self.epoch += 1
+            self.batch_in_epoch = 0
+            self.train_sampler.clear_resume_batch_offset()
+            self.train_sampler.set_absolute_epoch(self.epoch)
         data_iter = iter(self.train_loader)
         progress_bar = tqdm(
             total=self.max_steps,
@@ -1041,10 +1107,13 @@ class EasyWAMTrainer:
                 self.epoch += 1
                 self.batch_in_epoch = 0
                 self.train_sampler.clear_resume_batch_offset()
+                self.train_sampler.set_absolute_epoch(self.epoch)
                 data_iter = iter(self.train_loader)
                 continue
 
-            with self.accelerator.accumulate(self.model):
+            with _training_accumulation_context(
+                self.accelerator, self.model, is_deepspeed=self.is_deepspeed
+            ):
                 forward_context = nullcontext() if self.is_deepspeed else self.accelerator.autocast()
                 forward_start = time.perf_counter()
                 with forward_context:

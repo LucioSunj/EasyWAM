@@ -4,7 +4,6 @@ import torch
 import numpy as np
 from copy import deepcopy
 from ..utils.normalizer import LinearNormalizer, NormMode
-from utils.pytorch_utils import dict_apply
 from utils.logging_config import get_logger
 from .base_processor import BaseProcessor
 
@@ -247,6 +246,5 @@ class WAMProcessor(BaseProcessor):
             for trans in reversed(self.action_state_transforms):
                 data = trans.backward(data)
 
-        start_obs_step = self.num_obs_steps - 1
-        data["action"] = dict_apply(data["action"], lambda x: x[:, start_obs_step:, :])
+        # WAM predicts from the current frame, not after a past-observation prefix.
         return data

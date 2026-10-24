@@ -10,5 +10,6 @@
 | RoboTwin | Hub 下载、数据目录、统计、文本缓存与训练 | [数据与训练](robotwin_zh.md) |
 | RoboDojo | Hub 下载、数据目录、统计、文本缓存与训练 | [数据与训练](robodojo_zh.md) |
 | RoboCasa365 | Hub 下载、数据目录、统计、文本缓存与训练 | [数据与训练](robocasa_zh.md) |
+| FR3 真机 | 原始/OpenPI 数据、相对关节目标、统计与 FastWAM-IDM 训练 | [数据与训练](real_world_fr3_zh.md) |
 
 仿真环境安装和 rollout 评测统一放在 [Benchmark 文档](../benchmark/README_zh.md)中。

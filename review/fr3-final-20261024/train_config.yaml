@@ -1,0 +1,243 @@
+output_dir: ${oc.env:FR3_OUTPUT_DIR}
+batch_size: 8
+num_workers: 8
+dataloader_prefetch_factor: 16
+dataloader_persistent_workers: true
+dataloader_pin_memory: true
+dataloader_worker_threads: 1
+lr_scheduler_type: cosine
+learning_rate: 0.0001
+warmup_ratio: 0.05
+max_steps: 20000
+log_every: 100
+save_every: 2000
+checkpoint_save_limit: 3
+eval_every: 1000
+eval_num_inference_steps: 10
+eval_save_video: false
+gradient_accumulation_steps: 2
+mixed_precision: bf16
+seed: 42
+max_grad_norm: 1.0
+weight_decay: 0.01
+resume: null
+vae_micro_batch_size: null
+inference_cross_kv_reuse: true
+wandb:
+  enabled: false
+  workspace: null
+  project: easywam
+  name: real_world_fr3_fastwam_idm_wan22
+  group: null
+  mode: online
+data:
+  train:
+    _target_: data.lerobot.robot_video_dataset.RobotVideoDataset
+    dataset_dirs:
+    - ${oc.env:FR3_FINAL_DATASET_DIR}
+    shape_meta:
+      images:
+      - key: left
+        raw_shape:
+        - 3
+        - 480
+        - 640
+        shape:
+        - 3
+        - 224
+        - 224
+      - key: wrist
+        raw_shape:
+        - 3
+        - 480
+        - 640
+        shape:
+        - 3
+        - 224
+        - 224
+      action:
+      - key: default
+        raw_shape: 8
+        shape: 8
+      state:
+      - key: default
+        raw_shape: 8
+        shape: 8
+    num_frames: 17
+    global_sample_stride: 1
+    action_video_freq_ratio: 4
+    video_size:
+    - 224
+    - 448
+    camera_key: null
+    val_set_proportion: 0.0
+    is_training_set: true
+    pretrained_norm_stats: null
+    skip_padding_as_possible: false
+    concat_multi_camera: horizontal
+    processor:
+      _target_: data.lerobot.processors.wam_processor.WAMProcessor
+      shape_meta:
+        images:
+        - key: left
+          raw_shape:
+          - 3
+          - 480
+          - 640
+          shape:
+          - 3
+          - 224
+          - 224
+        - key: wrist
+          raw_shape:
+          - 3
+          - 480
+          - 640
+          shape:
+          - 3
+          - 224
+          - 224
+        action:
+        - key: default
+          raw_shape: 8
+          shape: 8
+        state:
+        - key: default
+          raw_shape: 8
+          shape: 8
+      num_obs_steps: 17
+      num_output_cameras: 2
+      action_output_dim: 8
+      proprio_output_dim: 8
+      delta_action_dim_mask: null
+      action_state_transforms:
+      - _target_: data.lerobot.transforms.relative_action.RelativeJointTransform
+        keys:
+        - default
+        joint_dim: 7
+      use_stepwise_action_norm: false
+      norm_default_mode: z-score
+      norm_exception_mode: null
+      action_state_merger:
+        _target_: data.lerobot.transforms.action_state_merger.ConcatLeftAlign
+      train_transforms:
+      - _target_: data.lerobot.transforms.image.ToTensor
+      - _target_: torchvision.transforms.Resize
+        size:
+        - 168
+        - 224
+      - _target_: data.lerobot.transforms.image.Pad
+        padding:
+        - 0
+        - 28
+        - 0
+        - 28
+      val_transforms:
+      - _target_: data.lerobot.transforms.image.ToTensor
+      - _target_: torchvision.transforms.Resize
+        size:
+        - 168
+        - 224
+      - _target_: data.lerobot.transforms.image.Pad
+        padding:
+        - 0
+        - 28
+        - 0
+        - 28
+    text_embedding_cache_dir: ${oc.env:FR3_TEXT_CACHE}
+    context_len: 128
+    text_encoder_id: wan22ti2v5b
+model:
+  backbone:
+    name: wan22
+    model_id: ${oc.env:WAN22_ROBOT_DIR}
+    dit_path: ${oc.env:WAN22_ROBOT_DIT}
+    text_encoder_path: ${oc.env:WAN22_T5_PATH}
+    vae_path: ${oc.env:WAN22_VAE_PATH}
+    tokenizer_model_id: ${oc.env:WAN22_TOKENIZER_DIR}
+    tokenizer_max_len: 128
+    load_text_encoder: false
+    text_encoder_id: wan22ti2v5b
+    text_dim: 4096
+    attention_backend: auto
+    use_gradient_checkpointing: false
+    num_layers: 30
+    num_heads: 24
+    attn_head_dim: 128
+    hidden_dim: 3072
+    freq_dim: 256
+    video_hidden_layer: 17
+    action_dit_pretrained_path: ${oc.env:FR3_ACTION_DIT_PATH}
+    dit_config:
+      has_image_input: false
+      patch_size:
+      - 1
+      - 2
+      - 2
+      in_dim: 48
+      hidden_dim: 3072
+      ffn_dim: 14336
+      freq_dim: 256
+      text_dim: 4096
+      out_dim: 48
+      num_heads: 24
+      attn_head_dim: 128
+      num_layers: 30
+      eps: 1.0e-06
+      seperated_timestep: true
+      fuse_vae_embedding_in_latents: true
+      video_attention_mask_mode: first_frame_causal
+      attention_backend: auto
+      use_gradient_checkpointing: false
+    video_scheduler:
+      train_shift: 5.0
+      infer_shift: 5.0
+      num_train_timesteps: 1000
+    lora_target_modules:
+    - self_attn.q
+    - self_attn.k
+    - self_attn.v
+    - self_attn.o
+    - cross_attn.q
+    - cross_attn.k
+    - cross_attn.v
+    - cross_attn.o
+    - ffn.0
+    - ffn.2
+  _target_: runtime.create_fastwam_idm
+  attention_backend: auto
+  state_dim: 8
+  state_position: context
+  projector_hidden_dim: 64
+  action_dit_pretrained_path: ${oc.env:FR3_ACTION_DIT_PATH}
+  skip_dit_load_from_pretrain: false
+  action_dit_config:
+    action_dim: 8
+    projector_hidden_dim: 64
+    hidden_dim: 1024
+    ffn_dim: 4096
+    num_heads: 24
+    attn_head_dim: 128
+    num_layers: 30
+    text_dim: 4096
+    freq_dim: 256
+    eps: 1.0e-06
+    attention_backend: auto
+    use_gradient_checkpointing: false
+  video_scheduler:
+    train_shift: 5.0
+    infer_shift: 5.0
+    num_train_timesteps: 1000
+  action_scheduler:
+    train_shift: 5.0
+    infer_shift: 5.0
+    num_train_timesteps: 1000
+  loss:
+    lambda_video: 1.0
+    lambda_action: 1.0
+  video_cond_noise_prob: 0.5
+text_encoder_device: cpu
+text_encoder_dtype: bfloat16
+overwrite: false
+state_checkpoint_save_limit: 1
+gradient_accumulation_sync_with_dataloader: false

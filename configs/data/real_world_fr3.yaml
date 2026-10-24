@@ -1,0 +1,65 @@
+train:
+  _target_: data.lerobot.robot_video_dataset.RobotVideoDataset
+  dataset_dirs:
+    - ./data/real_world_fr3_10hz
+  shape_meta:
+    images:
+      - key: left
+        raw_shape: [3, 480, 640]
+        shape: [3, 224, 224]
+      - key: wrist
+        raw_shape: [3, 480, 640]
+        shape: [3, 224, 224]
+    # Collector convention: seven joint angles/targets in radians, followed by
+    # gripper state/command (0 = open, 1 = closed). Preserve this on disk.
+    action:
+      - key: default
+        raw_shape: 8
+        shape: 8
+    state:
+      - key: default
+        raw_shape: 8
+        shape: 8
+  # The stored data is already 10 Hz. Sixteen actions span 1.6 seconds.
+  num_frames: 17
+  global_sample_stride: 1
+  action_video_freq_ratio: 4 # video offsets: 0, 4, 8, 12, 16
+  video_size: [224, 448]
+  camera_key: null
+  val_set_proportion: 0.0
+  is_training_set: true
+  pretrained_norm_stats: null
+  skip_padding_as_possible: false
+  concat_multi_camera: horizontal
+  processor:
+    _target_: data.lerobot.processors.wam_processor.WAMProcessor
+    shape_meta: ${data.train.shape_meta}
+    num_obs_steps: ${data.train.num_frames}
+    num_output_cameras: 2
+    action_output_dim: 8
+    proprio_output_dim: 8
+    # Stored actions are absolute: retain repeated terminal targets before
+    # subtracting the current state. Do not zero padded joints as delta commands.
+    delta_action_dim_mask: null
+    action_state_transforms:
+      - _target_: data.lerobot.transforms.relative_action.RelativeJointTransform
+        keys: [default]
+        joint_dim: 7
+    use_stepwise_action_norm: false
+    # Compute EasyWAM statistics after the relative-joint transform; OpenPI's
+    # statistics and normalization are not interchangeable with this recipe.
+    norm_default_mode: z-score
+    norm_exception_mode: null
+    action_state_merger:
+      _target_: data.lerobot.transforms.action_state_merger.ConcatLeftAlign
+    # Preserve the full 640x480 field of view within each 224x224 image.
+    train_transforms:
+      - _target_: data.lerobot.transforms.image.ToTensor
+      - _target_: torchvision.transforms.Resize
+        size: [168, 224]
+      - _target_: data.lerobot.transforms.image.Pad
+        padding: [0, 28, 0, 28]
+    val_transforms: ${data.train.processor.train_transforms}
+  text_embedding_cache_dir: ./data/text_embeds_cache/real_world_fr3/${model.backbone.name}
+  context_len: ${model.backbone.tokenizer_max_len}
+  text_encoder_id: ${model.backbone.text_encoder_id}

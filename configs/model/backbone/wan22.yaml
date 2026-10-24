@@ -1,5 +1,9 @@
 name: wan22
 model_id: ./checkpoints/Wan2.2-TI2V-5B
+# Optional files allow a separate Robot DiT and shared UMT5/VAE assets.
+dit_path: null
+text_encoder_path: null
+vae_path: null
 tokenizer_model_id: ./checkpoints/Wan2.2-TI2V-5B/google/umt5-xxl
 tokenizer_max_len: 128
 load_text_encoder: false
@@ -7,6 +11,8 @@ text_encoder_id: wan22ti2v5b
 text_dim: 4096
 attention_backend: auto
 use_gradient_checkpointing: false
+# Null checkpoints every joint MoT layer when checkpointing is enabled.
+mot_gradient_checkpointing_layers: null
 num_layers: 30
 num_heads: 24
 attn_head_dim: 128

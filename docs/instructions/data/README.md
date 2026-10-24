@@ -10,5 +10,6 @@ This section covers dataset downloads, the expected LeRobot layout, text-embeddi
 | RoboTwin | Hub download, dataset layout, statistics, text cache, and training | [Data and training](robotwin.md) |
 | RoboDojo | Hub download, dataset layout, statistics, text cache, and training | [Data and training](robodojo.md) |
 | RoboCasa365 | Hub download, dataset layout, statistics, text cache, and training | [Data and training](robocasa.md) |
+| FR3 real-world | Raw/OpenPI data, relative joint targets, statistics, and FastWAM-IDM training | [Data and training](real_world_fr3.md) |
 
 Simulator setup and rollout evaluation are intentionally kept in the [benchmark guides](../benchmark/README.md).

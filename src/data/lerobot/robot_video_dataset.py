@@ -247,7 +247,7 @@ class RobotVideoDataset(torch.utils.data.Dataset):
             "context_mask": context_mask,
             "image_is_pad": image_is_pad,
             "action_is_pad": sample["action_is_pad"],
-            "proprio_is_pad": sample["proprio_is_pad"],
+            "proprio_is_pad": sample["proprio_is_pad"][:-1],
         }
         if "action_dim_is_pad" in sample:
             data["action_dim_is_pad"] = sample["action_dim_is_pad"]
