@@ -4,6 +4,11 @@
 
 This section covers dataset downloads, the expected LeRobot layout, text-embedding preprocessing, normalization statistics, and benchmark-specific training entrypoints.
 
+`data.train.processor.action_clip_range` controls clipping after action
+normalization. It defaults to `[-5.0, 5.0]`; use `null` when the selected
+checkpoint was trained with unclipped action targets. State normalization
+retains its `[-5.0, 5.0]` range.
+
 | Dataset | Contents | Guide |
 | --- | --- | --- |
 | LIBERO | Hub download, dataset layout, statistics, text cache, and training | [Data and training](libero.md) |

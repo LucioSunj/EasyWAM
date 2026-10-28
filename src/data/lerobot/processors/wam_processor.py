@@ -35,6 +35,7 @@ class WAMProcessor(BaseProcessor):
 
         tokenizer: Optional[Any] = None,
         delta_action_dim_mask: Optional[Dict[str, List[bool]]] = None,
+        action_clip_range: tuple[float, float] | None = (-5.0, 5.0),
     ):
         self.shape_meta = shape_meta
         self.num_obs_steps = num_obs_steps
@@ -55,6 +56,7 @@ class WAMProcessor(BaseProcessor):
         self.action_state_merger.set_shape_meta(self.shape_meta)
 
         self.use_stepwise_action_norm = use_stepwise_action_norm
+        self.action_clip_range = action_clip_range
         self.norm_default_mode = norm_default_mode
         self.norm_exception_mode = norm_exception_mode
         self._normalizer = None
@@ -109,6 +111,7 @@ class WAMProcessor(BaseProcessor):
             default_mode=self.norm_default_mode,
             exception_mode=self.norm_exception_mode,
             stats=dataset_stats,
+            action_clip_range=self.action_clip_range,
         )
 
     def augment_instruction(self, data: Dict[str, str] | List[str]) -> List[str]:
