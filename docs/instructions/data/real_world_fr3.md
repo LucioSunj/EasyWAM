@@ -144,6 +144,19 @@ The sources are under `dataset_real_world/fr3_example_deployment`: recording def
 
 The recipe uses global z-score normalization after the relative-joint transform, with EasyWAM's normalized-value clipping to `[-5, 5]`. With `data.train.pretrained_norm_stats: null`, dataset initialization computes EasyWAM statistics and saves `dataset_stats.json` under the training output directory. Statistics retain EasyWAM's per-episode aggregation and terminal-repetition semantics. Compute them from the full selected training corpus; a one-episode smoke file is insufficient. OpenPI statistics, LeRobot `episodes_stats.jsonl`, and LIBERO statistics are not substitutes. The reference OpenPI check used `skip_norm_stats=True` and did not validate this recipe's statistics.
 
+For a new run whose valid action targets exceed that range, explicitly set
+`data.train.processor.action_clip_range: null` in the resolved configuration.
+This disables only action-target clipping; the affine statistics, relative-joint
+transform, padding masks, and state normalization are unchanged. Omitting the
+option preserves the legacy `[-5, 5]` behavior. A two-element finite increasing
+range configures explicit action bounds instead.
+
+Do not silently change this option on an existing run or only at inference.
+Keep the checkpoint, resolved configuration, statistics, and matching processor
+source together. Disabling target clipping is not permission to disable robot
+safety checks or joint limits. Compare new runs separately from legacy clipped
+checkpoints.
+
 [`scripts/run_real_world_fr3.sh`](../../../scripts/run_real_world_fr3.sh) is the new one-command entrypoint. It changes to the EasyWAM root, selects `.venv/bin/python`, and sets `PATH`/`PYTHONPATH`. It invokes [`run_real_world_fr3.py`](../../../scripts/run_real_world_fr3.py), which composes one final Hydra configuration and passes the same data, assets, cache settings, and user overrides to every stage. A failed subprocess prevents later stages. **With no stage argument, it defaults to `all` and starts training at the end.** Select `prepare` to stop after preparation. With the environment activated, `python scripts/run_real_world_fr3.py <stage>` is equivalent.
 
 | Stage | Operation |

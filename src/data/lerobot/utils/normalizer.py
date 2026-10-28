@@ -1,3 +1,4 @@
+from collections.abc import Mapping, Sequence
 from typing import Literal, Dict, Annotated, Union, Any, List, Tuple, Optional
 import torch
 import json
@@ -5,6 +6,7 @@ from collections import defaultdict
 import numpy as np
 from omegaconf import DictConfig, OmegaConf
 import hashlib
+import math
 from pathlib import Path
 from git import Repo
 from utils.logging_config import get_logger
@@ -23,11 +25,15 @@ class LinearNormalizer:
             use_stepwise_action_norm,
             default_mode: NormMode, 
             exception_mode: Dict[str, Dict[str, NormMode]], 
-            stats: Dict[str, Dict[str, Dict[str, torch.Tensor]]]
+            stats: Dict[str, Dict[str, Dict[str, torch.Tensor]]],
+            action_clip_range: Optional[Tuple[float, float]] = (-5.0, 5.0),
+            state_clip_range: Optional[Tuple[float, float]] = (-5.0, 5.0),
+            binary_dims: Optional[Dict[str, Dict[str, Sequence[int]]]] = None,
         ):
         super().__init__()
         self.normalizers = {"action": {}, "state": {}}
         self.stats = stats
+        binary_dims = self._validate_binary_dims(shape_meta, binary_dims)
 
         for meta in shape_meta["action"]:
             key = meta["key"]
@@ -45,6 +51,8 @@ class LinearNormalizer:
             self.normalizers["action"][key] = SingleFieldLinearNormalizer(
                 stats=cur_stats, 
                 mode=cur_mode,
+                clip_range=action_clip_range,
+                binary_dims=binary_dims["action"].get(key),
             )
 
         for meta in shape_meta["state"]:
@@ -59,7 +67,77 @@ class LinearNormalizer:
             self.normalizers["state"][key] = SingleFieldLinearNormalizer(
                 stats=cur_stats, 
                 mode=cur_mode,
+                clip_range=state_clip_range,
+                binary_dims=binary_dims["state"].get(key),
             )
+
+    @staticmethod
+    def _field_dim(meta: Dict[str, Any]) -> int:
+        shape = meta.get("shape")
+        if isinstance(shape, bool):
+            raise ValueError(f"Invalid field shape for {meta.get('key')!r}: {shape!r}")
+        if isinstance(shape, int):
+            dim = shape
+        elif isinstance(shape, Sequence) and not isinstance(shape, (str, bytes)) and len(shape) == 1:
+            dim = shape[0]
+        else:
+            raise ValueError(
+                f"Binary dimensions require one-dimensional action/state fields, got shape={shape!r} "
+                f"for key={meta.get('key')!r}."
+            )
+        if isinstance(dim, bool) or not isinstance(dim, int) or dim <= 0:
+            raise ValueError(f"Invalid field shape for {meta.get('key')!r}: {shape!r}")
+        return dim
+
+    @classmethod
+    def _validate_binary_dims(
+        cls,
+        shape_meta: Dict[str, Any],
+        binary_dims: Optional[Dict[str, Dict[str, Sequence[int]]]],
+    ) -> Dict[str, Dict[str, Tuple[int, ...]]]:
+        normalized: Dict[str, Dict[str, Tuple[int, ...]]] = {"action": {}, "state": {}}
+        if binary_dims is None:
+            return normalized
+        if not isinstance(binary_dims, Mapping):
+            raise TypeError("binary_dims must be null or a mapping of action/state field keys to indices")
+
+        unknown_categories = set(binary_dims) - set(normalized)
+        if unknown_categories:
+            raise ValueError(f"Unknown binary_dims categories: {sorted(unknown_categories)!r}")
+
+        for category in normalized:
+            fields = binary_dims.get(category, {})
+            if fields is None:
+                raise ValueError(f"binary_dims[{category!r}] must be a mapping, not null")
+            if not isinstance(fields, Mapping):
+                raise TypeError(f"binary_dims[{category!r}] must be a mapping of field keys to indices")
+            metas = {meta["key"]: meta for meta in shape_meta.get(category, [])}
+            unknown_fields = set(fields) - set(metas)
+            if unknown_fields:
+                raise ValueError(
+                    f"Unknown binary_dims[{category!r}] field keys: {sorted(unknown_fields)!r}"
+                )
+            for key, dims in fields.items():
+                if isinstance(dims, (str, bytes)) or not isinstance(dims, Sequence):
+                    raise TypeError(f"binary_dims[{category!r}][{key!r}] must be a sequence of indices")
+                field_dim = cls._field_dim(metas[key])
+                parsed: List[int] = []
+                for dim in dims:
+                    if isinstance(dim, bool) or not isinstance(dim, int):
+                        raise ValueError(
+                            f"binary_dims[{category!r}][{key!r}] contains a non-integer index: {dim!r}"
+                        )
+                    if dim < 0 or dim >= field_dim:
+                        raise ValueError(
+                            f"binary_dims[{category!r}][{key!r}] index {dim} is outside [0, {field_dim})"
+                        )
+                    if dim in parsed:
+                        raise ValueError(
+                            f"binary_dims[{category!r}][{key!r}] contains duplicate index {dim}"
+                        )
+                    parsed.append(dim)
+                normalized[category][key] = tuple(parsed)
+        return normalized
 
     def get_stats(self):
         stats = {
@@ -93,9 +171,27 @@ class SingleFieldLinearNormalizer:
     range_tol = 1e-4
     output_max = 1.0
     output_min = -1.0
-    def __init__(self, stats, mode: NormMode="min/max"):
+    def __init__(
+        self,
+        stats,
+        mode: NormMode="min/max",
+        clip_range=(-5.0, 5.0),
+        binary_dims: Optional[Sequence[int]] = None,
+    ):
         self.stats = stats
         self.mode = mode
+        self.binary_dims = self._validate_binary_dims(binary_dims, stats)
+        self.clip_range = None
+        if clip_range is not None:
+            try:
+                if isinstance(clip_range, (str, bytes)) or len(clip_range) != 2:
+                    raise ValueError
+                lower, upper = (float(bound) for bound in clip_range)
+            except (TypeError, ValueError, OverflowError) as error:
+                raise ValueError("clip_range must be None or two finite increasing bounds") from error
+            if not math.isfinite(lower) or not math.isfinite(upper) or lower >= upper:
+                raise ValueError("clip_range must be None or two finite increasing bounds")
+            self.clip_range = (lower, upper)
 
         if mode == "z-score":
             input_mean, input_std = stats["mean"], stats["std"]
@@ -121,16 +217,59 @@ class SingleFieldLinearNormalizer:
 
         self.scale = scale
         self.offset = offset
+        if self.binary_dims:
+            # Expose the fixed binary affine contract through the public
+            # coefficients as well as through forward/backward behavior.
+            self.scale = self.scale.clone()
+            self.offset = self.offset.clone()
+            self.scale[list(self.binary_dims)] = 2.0
+            self.offset[list(self.binary_dims)] = -1.0
+
+    @staticmethod
+    def _validate_binary_dims(binary_dims, stats) -> Tuple[int, ...]:
+        if binary_dims is None:
+            return ()
+        if isinstance(binary_dims, (str, bytes)) or not isinstance(binary_dims, Sequence):
+            raise TypeError("binary_dims must be null or a sequence of indices")
+        field_dim = stats["mean"].shape[-1]
+        parsed: List[int] = []
+        for dim in binary_dims:
+            if isinstance(dim, bool) or not isinstance(dim, int):
+                raise ValueError(f"binary_dims contains a non-integer index: {dim!r}")
+            if dim < 0 or dim >= field_dim:
+                raise ValueError(f"binary_dims index {dim} is outside [0, {field_dim})")
+            if dim in parsed:
+                raise ValueError(f"binary_dims contains duplicate index {dim}")
+            parsed.append(dim)
+        return tuple(parsed)
     def get_stats(self):
         return self.stats
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.binary_dims and not torch.isfinite(x).all():
+            raise ValueError("normalizer inputs must contain only finite values")
+        if self.binary_dims:
+            binary_values = x[..., list(self.binary_dims)]
+            if not torch.isfinite(binary_values).all():
+                raise ValueError("binary dimensions must contain only finite 0/1 values")
+            if not torch.logical_or(binary_values == 0, binary_values == 1).all():
+                raise ValueError("binary dimensions must contain only exact 0/1 values")
+        else:
+            binary_values = None
+
         x = x * self.scale + self.offset
-        x = torch.clamp(x, -5.0, 5.0)
+        if self.clip_range is not None:
+            x = torch.clamp(x, *self.clip_range)
+        if binary_values is not None:
+            # Fixed semantics are independent of empirical mean/std and must
+            # not be affected by the continuous clip range.
+            x = x.clone()
+            x[..., list(self.binary_dims)] = binary_values * 2 - 1
         return x
     def backward(self, x: torch.Tensor) -> torch.Tensor:
-        x = (x - self.offset) / self.scale
-        return x
+        # Predictions remain continuous; this is the inverse affine map, not
+        # a threshold or clamp back to {0, 1}.
+        return (x - self.offset) / self.scale
 
 def save_dataset_stats_to_json(dataset_stats: dict, file_path: str):
 

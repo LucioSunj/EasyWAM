@@ -4,6 +4,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
+import torch
 from omegaconf import OmegaConf
 from trainer import EasyWAMTrainer
 
@@ -110,6 +111,105 @@ def test_old_state_survives_until_new_save_completes(tmp_path, save_fails):
         assert sorted(p.name for p in Path(trainer.state_dir).iterdir()) == ['step_010000']
         assert (Path(trainer.state_dir) / 'step_010000/trainer_state.json').exists()
         assert len(list(Path(trainer.weights_dir).glob('*.pt'))) == 3
+
+
+def test_completed_state_rejects_overwrite_before_any_writes(tmp_path):
+    trainer = fixture_trainer(tmp_path)
+    trainer.global_step = 8000
+    trainer.batch_size = 8
+    trainer.epoch = trainer.batch_in_epoch = 0
+    state_path = Path(trainer.state_dir) / 'step_008000'
+    old_marker = (state_path / 'trainer_state.json').read_text()
+    (state_path / 'shard.pt').write_text('old shard')
+    calls = []
+    trainer._save_weights_checkpoint = lambda **kwargs: calls.append('weights')
+    trainer.accelerator = SimpleNamespace(
+        is_main_process=True,
+        wait_for_everyone=lambda: calls.append('barrier'),
+        save_state=lambda **kwargs: calls.append('state'),
+        num_processes=2,
+        gradient_accumulation_steps=4,
+    )
+
+    with pytest.raises(FileExistsError, match='completed checkpoint state'):
+        trainer.save_checkpoint()
+
+    assert calls == []
+    assert (state_path / 'trainer_state.json').read_text() == old_marker
+    assert (state_path / 'shard.pt').read_text() == 'old shard'
+
+
+def test_partial_state_failure_leaves_no_completion_marker(tmp_path):
+    trainer = fixture_trainer(tmp_path)
+    trainer.global_step = 10000
+    trainer.batch_size = 8
+    trainer.epoch = trainer.batch_in_epoch = 0
+
+    def save_weights(*, step_tag):
+        path = Path(trainer.weights_dir) / (step_tag + '.pt')
+        path.write_text('new weights')
+        return str(path)
+
+    def save_state(*, output_dir):
+        (Path(output_dir) / 'partial-shard.pt').write_text('partial')
+        raise OSError('synthetic incomplete state')
+
+    trainer._save_weights_checkpoint = save_weights
+    trainer.accelerator = SimpleNamespace(
+        is_main_process=True,
+        wait_for_everyone=lambda: None,
+        save_state=save_state,
+        num_processes=2,
+        gradient_accumulation_steps=4,
+    )
+    with pytest.raises(OSError, match='incomplete'):
+        trainer.save_checkpoint()
+
+    failed_state = Path(trainer.state_dir) / 'step_010000'
+    assert (failed_state / 'partial-shard.pt').exists()
+    assert not (failed_state / 'trainer_state.json').exists()
+
+
+def test_other_rank_completed_marker_rejects_before_any_writes(tmp_path):
+    trainer = EasyWAMTrainer.__new__(EasyWAMTrainer)
+    trainer.state_dir = str(tmp_path / 'state')
+    trainer.weights_dir = str(tmp_path / 'weights')
+    trainer.global_step = 10000
+    calls = []
+    trainer._save_weights_checkpoint = lambda **kwargs: calls.append('weights')
+
+    class CollectiveAccelerator:
+        is_main_process = True
+        device = torch.device('cpu')
+
+        def gather(self, local_marker):
+            # This rank sees no marker locally; another rank has one.
+            return torch.tensor([0, 1], device=local_marker.device)
+
+        def wait_for_everyone(self):
+            calls.append('barrier')
+
+        def save_state(self, **kwargs):
+            calls.append('state')
+
+    trainer.accelerator = CollectiveAccelerator()
+    with pytest.raises(FileExistsError, match='completed checkpoint state'):
+        trainer.save_checkpoint()
+    assert calls == []
+    assert not (Path(trainer.state_dir) / 'step_010000').exists()
+
+
+def test_resume_at_max_steps_does_not_iterate_or_save(tmp_path):
+    trainer = EasyWAMTrainer.__new__(EasyWAMTrainer)
+    trainer.max_steps = 1
+    trainer.global_step = 1
+    trainer._resume_state_loaded = True
+    events = []
+    trainer._set_dit_only_train_mode = lambda: events.append('train_mode')
+    trainer.save_checkpoint = lambda: pytest.fail('already-complete resume must not save')
+
+    trainer.train()
+    assert events == ['train_mode']
 
 
 @pytest.mark.parametrize('field,value', [('batch_size', 4), ('num_processes', 4),
