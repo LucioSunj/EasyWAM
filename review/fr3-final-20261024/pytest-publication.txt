@@ -1,0 +1,21 @@
+........................................................................ [ 34%]
+........................................................................ [ 69%]
+................................................................         [100%]
+=============================== warnings summary ===============================
+tests/test_convert_real_world_fr3.py::test_raw_conversion_and_training_sample
+  /path/to/storage/SJ/Outer/EasyWAM/.venv/lib/python3.10/site-packages/torchvision/io/_video_deprecation_warning.py:5: UserWarning: The video decoding and encoding capabilities of torchvision are deprecated from version 0.22 and will be removed in version 0.24. We recommend that you migrate to TorchCodec, where we'll consolidate the future decoding/encoding capabilities of PyTorch: https://github.com/pytorch/torchcodec
+    warnings.warn(
+
+tests/test_fastwam.py::test_native_training_entrypoint_saves_and_resumes_cpu_state
+tests/test_fastwam.py::test_native_training_entrypoint_saves_and_resumes_cpu_state
+tests/test_fastwam.py::test_native_training_entrypoint_saves_and_resumes_cpu_state
+tests/test_fastwam.py::test_native_training_entrypoint_saves_and_resumes_cpu_state
+  /path/to/storage/SJ/Outer/EasyWAM/.venv/lib/python3.10/site-packages/deepspeed/runtime/config_utils.py:100: PydanticDeprecatedSince211: Accessing the 'model_fields' attribute on the instance is deprecated. Instead, you should access this attribute from the model class. Deprecated in Pydantic V2.11 to be removed in V3.0.
+    fields = self.model_fields
+
+tests/test_fastwam.py::test_native_training_entrypoint_saves_and_resumes_cpu_state
+  /path/to/storage/SJ/Outer/EasyWAM/.venv/lib/python3.10/site-packages/torch/utils/data/dataloader.py:665: UserWarning: 'pin_memory' argument is set as true but no accelerator is found, then device pinned memory won't be used.
+    warnings.warn(warn_msg)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+208 passed, 6 warnings in 21.45s

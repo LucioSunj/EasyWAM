@@ -24,7 +24,11 @@ from utils.logging_config import get_logger, setup_logging
 from utils.pytorch_utils import set_global_seed
 from utils.samplers import ResumableEpochSampler
 from utils.video_io import save_mp4
-from utils.video_metrics import pil_frames_to_video_tensor, video_psnr, video_ssim
+from utils.video_metrics import (
+    masked_action_errors,
+    pil_frames_to_video_tensor,
+    video_metric_pair,
+)
 
 logger = get_logger(__name__)
 
@@ -70,6 +74,88 @@ def _forward_training_model(model, sample):
     return loss, metrics
 
 
+def _batch_eval_mask(
+    value: torch.Tensor,
+    *,
+    key: str,
+    batch_size: int,
+    num_steps: int,
+    num_dims: int | None = None,
+) -> torch.Tensor:
+    """Batch an optional [T] or [D]/[T,D] mask without implicit broadcasting."""
+    if not isinstance(value, torch.Tensor):
+        raise TypeError(f"`sample['{key}']` must be a torch.Tensor, got {type(value)}")
+    expected = (num_steps,) if num_dims is None else (num_dims,)
+    if value.ndim == 1:
+        if value.shape[0] != expected[0]:
+            raise ValueError(
+                f"`sample['{key}']` length must be {expected[0]}, got shape {tuple(value.shape)}"
+            )
+        if batch_size != 1:
+            raise ValueError(
+                f"Unbatched `sample['{key}']` cannot be used with batch size {batch_size}; "
+                f"expected shape ({batch_size}, {expected[0]})."
+            )
+        return value.to(dtype=torch.bool).unsqueeze(0)
+    if num_dims is None:
+        if value.ndim == 2 and tuple(value.shape) == (batch_size, num_steps):
+            return value.to(dtype=torch.bool)
+        raise ValueError(
+            f"`sample['{key}']` must have shape [{num_steps}] or "
+            f"[{batch_size}, {num_steps}], got {tuple(value.shape)}"
+        )
+    if value.ndim == 2:
+        if tuple(value.shape) == (batch_size, num_dims):
+            return value.to(dtype=torch.bool)
+        if tuple(value.shape) == (num_steps, num_dims):
+            if batch_size != 1:
+                raise ValueError(
+                    f"Unbatched `sample['{key}']` cannot be used with batch size {batch_size}; "
+                    f"expected shape ({batch_size}, {num_steps}, {num_dims})."
+                )
+            return value.to(dtype=torch.bool).unsqueeze(0)
+        raise ValueError(
+            f"`sample['{key}']` must have shape [{num_dims}], "
+            f"[{batch_size}, {num_dims}], or [{num_steps}, {num_dims}], "
+            f"got {tuple(value.shape)}"
+        )
+    if value.ndim == 3 and tuple(value.shape) == (batch_size, num_steps, num_dims):
+        return value.to(dtype=torch.bool)
+    raise ValueError(
+        f"`sample['{key}']` must have shape [{num_dims}], "
+        f"[{num_steps}, {num_dims}], [{batch_size}, {num_dims}], or "
+        f"[{batch_size}, {num_steps}, {num_dims}], got {tuple(value.shape)}"
+    )
+
+
+def _canonicalize_eval_video(video: torch.Tensor, image_is_pad: torch.Tensor | None) -> torch.Tensor:
+    """Canonicalize padded frames only for VAE reconstruction inputs."""
+    if image_is_pad is None:
+        return video
+    if video.ndim != 5 or image_is_pad.ndim != 2:
+        raise ValueError(
+            "Eval VAE video/mask must be [B,C,T,H,W]/[B,T], "
+            f"got {tuple(video.shape)} and {tuple(image_is_pad.shape)}."
+        )
+    if tuple(image_is_pad.shape) != (video.shape[0], video.shape[2]):
+        raise ValueError(
+            "Eval VAE image padding shape mismatch: "
+            f"video={tuple(video.shape)} mask={tuple(image_is_pad.shape)}."
+        )
+    padding = image_is_pad.to(device=video.device, dtype=torch.bool)
+    positions = torch.arange(video.shape[2], device=video.device).expand(video.shape[0], -1)
+    latest = positions.masked_fill(padding, -1).cummax(dim=1).values
+    indices = latest.clamp_min(0)[:, None, :, None, None].expand_as(video)
+    canonical = video.gather(2, indices)
+    return canonical.masked_fill((latest < 0)[:, None, :, None, None], 0)
+
+
+def _training_accumulation_context(accelerator, model, *, is_deepspeed):
+    # DeepSpeed owns gradient reduction; its step() must not run inside no_sync().
+    models = () if is_deepspeed else (model,)
+    return accelerator.accumulate(*models)
+
+
 class EasyWAMTrainer:
     def __init__(self, model, train_dataset, val_dataset=None, *, cfg: DictConfig, accelerator: Accelerator):
         self.model = model
@@ -106,6 +192,15 @@ class EasyWAMTrainer:
             raise ValueError(
                 "`checkpoint_save_limit` must be null or > 0, "
                 f"got {self.checkpoint_save_limit}."
+            )
+        state_checkpoint_save_limit = cfg.get("state_checkpoint_save_limit", checkpoint_save_limit)
+        self.state_checkpoint_save_limit = (
+            None if state_checkpoint_save_limit is None else int(state_checkpoint_save_limit)
+        )
+        if self.state_checkpoint_save_limit is not None and self.state_checkpoint_save_limit <= 0:
+            raise ValueError(
+                "`state_checkpoint_save_limit` must be null or > 0, "
+                f"got {self.state_checkpoint_save_limit}."
             )
         self.eval_every = int(cfg.eval_every)
         self.eval_num_inference_steps = int(cfg.eval_num_inference_steps)
@@ -163,6 +258,11 @@ class EasyWAMTrainer:
 
         # Freeze modules before ZeRO builds optimizer state.
         self._apply_dit_only_train_mode(self.model)
+        # Weight-only initialization must happen before DeepSpeed snapshots the
+        # optimizer/model parameters. Loading after prepare() leaves ZeRO's
+        # independent master parameters at their pre-load values.
+        self._weight_resume_loaded = False
+        self._load_weight_checkpoint_before_prepare()
         total_params = _count_parameters(self.model)
         trainable_params_count = _count_parameters(self.model, trainable_only=True)
         if self.accelerator.is_main_process:
@@ -200,6 +300,7 @@ class EasyWAMTrainer:
         self.global_step = 0
         self.epoch = 0
         self.batch_in_epoch = 0
+        self._resume_state_loaded = False
 
         self.checkpoint_root = os.path.join(self.output_dir, "checkpoints")
         self.weights_dir = os.path.join(self.checkpoint_root, "weights")
@@ -451,9 +552,31 @@ class EasyWAMTrainer:
             return
         if not resume_path.exists():
             raise FileNotFoundError(f"Resume checkpoint not found: {resume}")
-        logger.info("Loading weight checkpoint only: %s", resume)
-        self.accelerator.unwrap_model(self.model).load_checkpoint(str(resume_path), optimizer=None)
-        logger.warning("Loaded .pt weights only; optimizer/scheduler/step were not restored under ZeRO2.")
+        if not self._weight_resume_loaded:
+            raise RuntimeError(
+                "Weight checkpoint must be loaded before accelerator.prepare(); "
+                f"resume={resume} was not initialized during trainer construction."
+            )
+        logger.info("Weight checkpoint was loaded before accelerator.prepare(): %s", resume)
+
+    def _load_weight_checkpoint_before_prepare(self):
+        """Load a .pt initialization before optimizer/DeepSpeed preparation."""
+        resume = self.resume
+        if not resume:
+            return
+
+        resume_path = Path(str(resume))
+        if resume_path.is_dir():
+            return
+        if not resume_path.exists():
+            raise FileNotFoundError(f"Resume checkpoint not found: {resume}")
+
+        logger.info("Loading weight checkpoint before accelerator.prepare(): %s", resume)
+        self.model.load_checkpoint(str(resume_path), optimizer=None)
+        self._weight_resume_loaded = True
+        logger.warning(
+            "Loaded .pt weights only; optimizer/scheduler/step were not restored."
+        )
 
     def _set_dit_only_train_mode(self):
         # Match DiffSynth's freeze_except("dit"): only DiT stays trainable/in-train-mode.
@@ -526,11 +649,14 @@ class EasyWAMTrainer:
                 action = action.unsqueeze(0)
             if action.ndim != 3:
                 raise ValueError(f"`sample['action']` must be 3D [B, T, a_dim], got shape {tuple(action.shape)}")
+            if action.shape[0] != video.shape[0]:
+                raise ValueError(
+                    f"Action batch mismatch: action batch={action.shape[0]} vs video batch={video.shape[0]}"
+                )
             if action.shape[1] % (num_video_frames - 1) != 0:
                 raise ValueError(f"`sample['action']` temporal dimension must be divisible by video frames-1={num_video_frames - 1}, got {action.shape[1]}")
             action_horizon = int(action.shape[1])
 
-        proprio = None
         if "proprio" in sample:
             proprio = sample["proprio"]
             if not isinstance(proprio, torch.Tensor):
@@ -539,6 +665,10 @@ class EasyWAMTrainer:
                 proprio = proprio.unsqueeze(0)
             if proprio.ndim != 3:
                 raise ValueError(f"`sample['proprio']` must be 3D [B, T, d], got shape {tuple(proprio.shape)}")
+            if proprio.shape[0] != video.shape[0]:
+                raise ValueError(
+                    f"Proprio batch mismatch: proprio batch={proprio.shape[0]} vs video batch={video.shape[0]}"
+                )
 
         if context is not None or context_mask is not None:
             if context is None or context_mask is None:
@@ -552,6 +682,64 @@ class EasyWAMTrainer:
                     f"`context/context_mask` must be [B,L,D]/[B,L], got {tuple(context.shape)} and {tuple(context_mask.shape)}"
                 )
 
+        batch_size = video.shape[0]
+        image_is_pad = None
+        if "image_is_pad" in sample and sample["image_is_pad"] is not None:
+            image_is_pad = _batch_eval_mask(
+                sample["image_is_pad"],
+                key="image_is_pad",
+                batch_size=batch_size,
+                num_steps=num_video_frames,
+            )
+
+        action_is_pad = None
+        action_dim_is_pad = None
+        if "action_is_pad" in sample and sample["action_is_pad"] is not None:
+            if action is None:
+                raise ValueError("`sample['action_is_pad']` requires `sample['action']`.")
+            action_is_pad = _batch_eval_mask(
+                sample["action_is_pad"],
+                key="action_is_pad",
+                batch_size=batch_size,
+                num_steps=action.shape[1],
+            )
+        if "action_dim_is_pad" in sample and sample["action_dim_is_pad"] is not None:
+            if action is None:
+                raise ValueError("`sample['action_dim_is_pad']` requires `sample['action']`.")
+            action_dim_is_pad = _batch_eval_mask(
+                sample["action_dim_is_pad"],
+                key="action_dim_is_pad",
+                batch_size=batch_size,
+                num_steps=action.shape[1],
+                num_dims=action.shape[2],
+            )
+
+        proprio_is_pad = None
+        proprio_dim_is_pad = None
+        raw_proprio_is_pad = sample.get("proprio_is_pad", sample.get("state_is_pad"))
+        if raw_proprio_is_pad is not None:
+            if proprio is None:
+                raise ValueError("`sample['proprio_is_pad']` requires `sample['proprio']`.")
+            proprio_is_pad = _batch_eval_mask(
+                raw_proprio_is_pad,
+                key="proprio_is_pad",
+                batch_size=batch_size,
+                num_steps=proprio.shape[1],
+            )
+        raw_proprio_dim_is_pad = sample.get(
+            "proprio_dim_is_pad", sample.get("state_dim_is_pad")
+        )
+        if raw_proprio_dim_is_pad is not None:
+            if proprio is None:
+                raise ValueError("`sample['proprio_dim_is_pad']` requires `sample['proprio']`.")
+            proprio_dim_is_pad = _batch_eval_mask(
+                raw_proprio_dim_is_pad,
+                key="proprio_dim_is_pad",
+                batch_size=batch_size,
+                num_steps=proprio.shape[1],
+                num_dims=proprio.shape[2],
+            )
+
         return {
             "video": video,
             "prompt": prompt,
@@ -559,6 +747,11 @@ class EasyWAMTrainer:
             "proprio": proprio,
             "context": context,
             "context_mask": context_mask,
+            "image_is_pad": image_is_pad,
+            "action_is_pad": action_is_pad,
+            "action_dim_is_pad": action_dim_is_pad,
+            "proprio_is_pad": proprio_is_pad,
+            "proprio_dim_is_pad": proprio_dim_is_pad,
             "action_horizon": action_horizon,
         }
 
@@ -619,11 +812,21 @@ class EasyWAMTrainer:
             f"pred={tuple(pred_video_tensor.shape)} vs gt={tuple(gt_video_tensor.shape)}"
         )
 
-        psnr_rollout_vs_gt = video_psnr(pred=pred_video_tensor, target=gt_video_tensor)
-        ssim_rollout_vs_gt = video_ssim(pred=pred_video_tensor, target=gt_video_tensor)
+        image_valid_frames = None
+        if sample["image_is_pad"] is not None:
+            image_valid_frames = ~sample["image_is_pad"][0]
+
+        # Keep the existing all-frame metric convention; only padded frames
+        # are removed when an image padding mask is present.
+        psnr_rollout_vs_gt, ssim_rollout_vs_gt, video_valid_count = video_metric_pair(
+            pred_video_tensor,
+            gt_video_tensor,
+            valid_frames=image_valid_frames,
+        )
 
         action_l1 = None
         action_l2 = None
+        action_valid_count = 0
         if action is not None and pred_action is not None:
             if sample["proprio"] is None:
                 raise ValueError("Eval sample must contain `proprio` for action denormalization.")
@@ -673,11 +876,27 @@ class EasyWAMTrainer:
                     "Predicted action/GT action shape mismatch after denormalization: "
                     f"pred={tuple(pred_action_denorm.shape)} vs gt={tuple(gt_action_denorm.shape)}"
                 )
-            action_diff = pred_action_denorm - gt_action_denorm
-            action_l1 = action_diff.abs().mean().item()
-            action_l2 = action_diff.pow(2).mean().item()
+            action_l1, action_l2, action_valid_count = masked_action_errors(
+                pred_action_denorm,
+                gt_action_denorm,
+                action_is_pad=(
+                    sample["action_is_pad"][0]
+                    if sample["action_is_pad"] is not None
+                    else None
+                ),
+                action_dim_is_pad=(
+                    sample["action_dim_is_pad"][0]
+                    if sample["action_dim_is_pad"] is not None
+                    else None
+                ),
+                return_count=True,
+            )
 
-        gt_video_batch = video0.unsqueeze(0).to(device=model.device, dtype=model.torch_dtype)
+        vae_video0 = _canonicalize_eval_video(
+            video0.unsqueeze(0),
+            sample["image_is_pad"][:1] if sample["image_is_pad"] is not None else None,
+        )[0]
+        gt_video_batch = vae_video0.unsqueeze(0).to(device=model.device, dtype=model.torch_dtype)
         vae_latents = model._encode_video_latents(gt_video_batch)
         vae_recon_batch = model._decode_latents(vae_latents)
         if len(vae_recon_batch) != 1:
@@ -692,11 +911,16 @@ class EasyWAMTrainer:
             f"vae={tuple(vae_video_tensor.shape)} vs gt={tuple(gt_video_tensor.shape)}"
         )
 
-        psnr_decode_vs_gt = video_psnr(pred=vae_video_tensor, target=gt_video_tensor)
-        ssim_decode_vs_gt = video_ssim(pred=vae_video_tensor, target=gt_video_tensor)
-
-        psnr_rollout_vs_decode = video_psnr(pred=pred_video_tensor, target=vae_video_tensor)
-        ssim_rollout_vs_decode = video_ssim(pred=pred_video_tensor, target=vae_video_tensor)
+        psnr_decode_vs_gt, ssim_decode_vs_gt, _ = video_metric_pair(
+            vae_video_tensor,
+            gt_video_tensor,
+            valid_frames=image_valid_frames,
+        )
+        psnr_rollout_vs_decode, ssim_rollout_vs_decode, _ = video_metric_pair(
+            pred_video_tensor,
+            vae_video_tensor,
+            valid_frames=image_valid_frames,
+        )
 
         video_path = self._save_eval_video(
             pred_video_tensor,
@@ -704,39 +928,73 @@ class EasyWAMTrainer:
             gt_video_tensor,
         )
 
+        metric_values = [
+            psnr_rollout_vs_gt,
+            ssim_rollout_vs_gt,
+            psnr_rollout_vs_decode,
+            ssim_rollout_vs_decode,
+            psnr_decode_vs_gt,
+            ssim_decode_vs_gt,
+            action_l2,
+            action_l1,
+        ]
+        metric_counts = [
+            video_valid_count,
+            video_valid_count,
+            video_valid_count,
+            video_valid_count,
+            video_valid_count,
+            video_valid_count,
+            action_valid_count,
+            action_valid_count,
+        ]
         local_metrics = torch.tensor(
-            [
-                float(val_loss),
-                float(psnr_rollout_vs_gt),
-                float(ssim_rollout_vs_gt),
-                float(psnr_rollout_vs_decode),
-                float(ssim_rollout_vs_decode),
-                float(psnr_decode_vs_gt),
-                float(ssim_decode_vs_gt),
-                float(action_l2) if action_l2 is not None else -1.0,
-                float(action_l1) if action_l1 is not None else -1.0,
-            ],
+            [float(val_loss)]
+            + [float(value) if value is not None else 0.0 for value in metric_values],
+            device=self.accelerator.device,
+            dtype=torch.float32,
+        ).unsqueeze(0)
+        local_counts = torch.tensor(
+            [1.0] + [float(count) for count in metric_counts],
             device=self.accelerator.device,
             dtype=torch.float32,
         ).unsqueeze(0)
         gathered_metrics = self.accelerator.gather_for_metrics(local_metrics)
-        mean_metrics = gathered_metrics[:, :7].mean(dim=0)
-        action_l2_mean = gathered_metrics[:, 7].mean().item() if action_l2 is not None else None
-        action_l1_mean = gathered_metrics[:, 8].mean().item() if action_l1 is not None else None
+        gathered_counts = self.accelerator.gather_for_metrics(local_counts)
+        total_counts = gathered_counts.sum(dim=0)
+        weighted_sums = (gathered_metrics * gathered_counts).sum(dim=0)
+        reduced_metrics = torch.where(
+            total_counts > 0,
+            weighted_sums / total_counts.clamp_min(1.0),
+            torch.full_like(total_counts, -1.0),
+        )
+        action_l2_mean = (
+            float(reduced_metrics[7].item()) if total_counts[7].item() > 0 else None
+        )
+        action_l1_mean = (
+            float(reduced_metrics[8].item()) if total_counts[8].item() > 0 else None
+        )
 
         if was_dit_training:
             self._set_dit_only_train_mode()
 
         result = {
-            "val_loss": float(mean_metrics[0].item()),
-            "psnr_rg": float(mean_metrics[1].item()),
-            "ssim_rg": float(mean_metrics[2].item()),
-            "psnr_rd": float(mean_metrics[3].item()),
-            "ssim_rd": float(mean_metrics[4].item()),
-            "psnr_dg": float(mean_metrics[5].item()),
-            "ssim_dg": float(mean_metrics[6].item()),
+            "val_loss": float(reduced_metrics[0].item()),
+            "video_valid_frames": int(total_counts[1].item()),
+            "action_valid_elements": int(total_counts[7].item()),
             "video_path": video_path,
         }
+        if total_counts[1].item() > 0:
+            result.update(
+                {
+                    "psnr_rg": float(reduced_metrics[1].item()),
+                    "ssim_rg": float(reduced_metrics[2].item()),
+                    "psnr_rd": float(reduced_metrics[3].item()),
+                    "ssim_rd": float(reduced_metrics[4].item()),
+                    "psnr_dg": float(reduced_metrics[5].item()),
+                    "ssim_dg": float(reduced_metrics[6].item()),
+                }
+            )
         if action_l2_mean is not None:
             result["action_l2"] = float(action_l2_mean)
         if action_l1_mean is not None:
@@ -801,9 +1059,19 @@ class EasyWAMTrainer:
             "global_step": int(self.global_step),
             "epoch": int(self.epoch),
             "batch_in_epoch": int(self.batch_in_epoch),
+            "batch_size": int(self.batch_size),
+            "num_processes": int(self.accelerator.num_processes),
+            "gradient_accumulation_steps": int(self.accelerator.gradient_accumulation_steps),
         }
-        with open(state_file, "w", encoding="utf-8") as f:
+        if getattr(self, "is_deepspeed", False):
+            engine = self.accelerator.deepspeed_engine_wrapped.engine
+            if int(engine.global_steps) != self.global_step:
+                raise ValueError("Cannot save inconsistent trainer and DeepSpeed optimizer steps.")
+            payload["deepspeed_global_step"] = int(engine.global_steps)
+        temporary_file = f"{state_file}.tmp"
+        with open(temporary_file, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=True, indent=2)
+        os.replace(temporary_file, state_file)
 
     @staticmethod
     def _prune_step_artifacts(directory: str, max_to_keep: int, *, suffix: str = ""):
@@ -829,20 +1097,47 @@ class EasyWAMTrainer:
             logger.info("[ckpt] removed old artifact: %s", path)
 
     def _prune_saved_checkpoints(self):
-        if self.checkpoint_save_limit is None:
-            return
-        self._prune_step_artifacts(
-            self.weights_dir,
-            self.checkpoint_save_limit,
-            suffix=".pt",
+        if self.checkpoint_save_limit is not None:
+            self._prune_step_artifacts(
+                self.weights_dir,
+                self.checkpoint_save_limit,
+                suffix=".pt",
+            )
+        if self.state_checkpoint_save_limit is not None:
+            self._prune_step_artifacts(
+                self.state_dir,
+                self.state_checkpoint_save_limit,
+            )
+
+    def _checkpoint_target_has_completed_state(self, state_path: str) -> bool:
+        """Collectively detect a published state marker before writing a checkpoint."""
+        marker_exists = Path(state_path, "trainer_state.json").is_file()
+        gather = getattr(self.accelerator, "gather", None)
+        if gather is None:
+            return marker_exists
+
+        device = getattr(self.accelerator, "device", "cpu")
+        marker = torch.tensor(
+            [int(marker_exists)],
+            device=device,
+            dtype=torch.int64,
         )
-        self._prune_step_artifacts(
-            self.state_dir,
-            self.checkpoint_save_limit,
-        )
+        gathered = gather(marker)
+        return bool(torch.any(gathered != 0).item())
 
     def save_checkpoint(self):
         step_tag = f"step_{self.global_step:06d}"
+        state_path = os.path.join(self.state_dir, step_tag)
+
+        # A published trainer_state.json is the completion marker. Never reuse
+        # that directory: a later shard failure could otherwise leave the old
+        # marker describing mixed-generation files. All ranks participate in
+        # the collective check so a rejection cannot strand another rank at a
+        # subsequent barrier.
+        if self._checkpoint_target_has_completed_state(state_path):
+            raise FileExistsError(
+                f"Refusing to overwrite completed checkpoint state: {state_path}"
+            )
 
         self.accelerator.wait_for_everyone()
         ckpt_path = None
@@ -850,12 +1145,13 @@ class EasyWAMTrainer:
             ckpt_path = self._save_weights_checkpoint(step_tag=step_tag)
         self.accelerator.wait_for_everyone()
 
-        state_path = os.path.join(self.state_dir, step_tag)
         ensure_dir(state_path)
         state_started_at = time.perf_counter()
         if self.accelerator.is_main_process:
             logger.info("[ckpt] saving distributed state: %s", state_path)
         self.accelerator.save_state(output_dir=state_path)
+        # Publish progress only after every rank has finished its state shard.
+        self.accelerator.wait_for_everyone()
         if self.accelerator.is_main_process:
             self._save_trainer_state(state_path)
             logger.info(
@@ -872,12 +1168,42 @@ class EasyWAMTrainer:
         return {"weights_path": ckpt_path, "state_path": state_path}
 
     def load_training_state(self, state_dir: str):
-        self.accelerator.load_state(input_dir=state_dir)
         state_file = Path(state_dir) / "trainer_state.json"
+        if not state_file.is_file():
+            raise ValueError(
+                f"Incomplete training state: missing {state_file}. "
+                "Use the newest complete state, or explicitly load a weight checkpoint."
+            )
+        if state_file.exists():
+            with open(state_file, "r", encoding="utf-8") as f:
+                saved_progress = json.load(f)
+            required_progress = {"global_step", "epoch", "batch_in_epoch"}
+            if not required_progress.issubset(saved_progress):
+                raise ValueError(
+                    f"Incomplete training state: missing progress fields "
+                    f"{sorted(required_progress - set(saved_progress))}."
+                )
+            expected = {
+                "batch_size": int(self.batch_size),
+                "num_processes": int(self.accelerator.num_processes),
+                "gradient_accumulation_steps": int(self.accelerator.gradient_accumulation_steps),
+            }
+            for name, value in expected.items():
+                if name in saved_progress and int(saved_progress[name]) != value:
+                    raise ValueError(f"Cannot resume with changed {name}: {saved_progress[name]} != {value}.")
+        self.accelerator.load_state(input_dir=state_dir)
+        if getattr(self, "is_deepspeed", False):
+            engine = self.accelerator.deepspeed_engine_wrapped.engine
+            if int(engine.global_steps) != int(saved_progress["global_step"]):
+                raise ValueError(
+                    "Cannot resume inconsistent trainer and DeepSpeed optimizer steps: "
+                    f"{saved_progress['global_step']} != {engine.global_steps}."
+                )
         if state_file.exists():
             with open(state_file, "r", encoding="utf-8") as f:
                 payload = json.load(f)
             self.global_step = int(payload["global_step"])
+            self._resume_state_loaded = True
 
             if "epoch" in payload and "batch_in_epoch" in payload:
                 self.epoch = int(payload["epoch"])
@@ -1020,6 +1346,24 @@ class EasyWAMTrainer:
             raise ValueError("`max_steps` must be set before entering the while-step training loop.")
 
         logger.info("Starting training with max_steps=%d.", self.max_steps)
+        if self._resume_state_loaded and self.global_step >= self.max_steps:
+            logger.info(
+                "[done] resumed state is already at or beyond max_steps: step=%d max_steps=%d",
+                self.global_step,
+                self.max_steps,
+            )
+            return
+
+        self.train_sampler.set_absolute_epoch(self.epoch)
+        if self.batch_in_epoch > 0 and len(self.train_sampler) == 0:
+            global_micro_batch = self.batch_size * self.accelerator.num_processes
+            full_epoch_batches = (len(self.train_dataset) + global_micro_batch - 1) // global_micro_batch
+            if self.batch_in_epoch != full_epoch_batches:
+                raise ValueError("Resume batch offset exceeds the epoch length.")
+            self.epoch += 1
+            self.batch_in_epoch = 0
+            self.train_sampler.clear_resume_batch_offset()
+            self.train_sampler.set_absolute_epoch(self.epoch)
         data_iter = iter(self.train_loader)
         progress_bar = tqdm(
             total=self.max_steps,
@@ -1041,10 +1385,13 @@ class EasyWAMTrainer:
                 self.epoch += 1
                 self.batch_in_epoch = 0
                 self.train_sampler.clear_resume_batch_offset()
+                self.train_sampler.set_absolute_epoch(self.epoch)
                 data_iter = iter(self.train_loader)
                 continue
 
-            with self.accelerator.accumulate(self.model):
+            with _training_accumulation_context(
+                self.accelerator, self.model, is_deepspeed=self.is_deepspeed
+            ):
                 forward_context = nullcontext() if self.is_deepspeed else self.accelerator.autocast()
                 forward_start = time.perf_counter()
                 with forward_context:
@@ -1156,26 +1503,37 @@ class EasyWAMTrainer:
                     metrics = self.evaluate()
                     self.accelerator.wait_for_everyone()
                     if metrics is not None and self.accelerator.is_main_process:
-                        description = "[eval] step=%d val_loss=%.6f infer_psnr=%.4f infer_ssim=%.4f" % (
+                        description = "[eval] step=%d val_loss=%.6f" % (
                             self.global_step,
                             metrics["val_loss"],
-                            metrics["psnr_rd"],
-                            metrics["ssim_rd"],
                         )
+                        if "psnr_rd" in metrics and "ssim_rd" in metrics:
+                            description += " infer_psnr=%.4f infer_ssim=%.4f" % (
+                                metrics["psnr_rd"],
+                                metrics["ssim_rd"],
+                            )
+                        description += " video_valid_frames=%d" % metrics["video_valid_frames"]
                         if "action_l2" in metrics:
                             description += " action_l2=%.4f" % metrics["action_l2"]
                         if "action_l1" in metrics:
                             description += " action_l1=%.4f" % metrics["action_l1"]
+                        description += " action_valid_elements=%d" % metrics["action_valid_elements"]
                         logger.info(description)
                         eval_payload = {
                             "eval/val_loss": float(metrics["val_loss"]),
-                            "eval/psnr_rg": float(metrics["psnr_rg"]),
-                            "eval/ssim_rg": float(metrics["ssim_rg"]),
-                            "eval/psnr_rd": float(metrics["psnr_rd"]),
-                            "eval/ssim_rd": float(metrics["ssim_rd"]),
-                            "eval/psnr_dg": float(metrics["psnr_dg"]),
-                            "eval/ssim_dg": float(metrics["ssim_dg"]),
+                            "eval/video_valid_frames": metrics["video_valid_frames"],
+                            "eval/action_valid_elements": metrics["action_valid_elements"],
                         }
+                        for metric_name in (
+                            "psnr_rg",
+                            "ssim_rg",
+                            "psnr_rd",
+                            "ssim_rd",
+                            "psnr_dg",
+                            "ssim_dg",
+                        ):
+                            if metric_name in metrics:
+                                eval_payload[f"eval/{metric_name}"] = float(metrics[metric_name])
                         if "action_l2" in metrics:
                             eval_payload["eval/action_l2"] = float(metrics["action_l2"])
                         if "action_l1" in metrics:

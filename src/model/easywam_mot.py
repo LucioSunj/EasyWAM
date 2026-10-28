@@ -197,7 +197,10 @@ class EasyWAMMoT(torch.nn.Module):
         model = cls(
             video_expert=video_expert,
             action_expert=action_expert,
-            mot=MoT({"video": video_expert, "action": action_expert}),
+            mot=MoT(
+                {"video": video_expert, "action": action_expert},
+                gradient_checkpointing_layers=cfg.get("mot_gradient_checkpointing_layers"),
+            ),
             vae=components.vae,
             text_encoder=components.text_encoder,
             tokenizer=components.tokenizer,

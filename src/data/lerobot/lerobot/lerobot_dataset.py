@@ -576,10 +576,22 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 )
         elif self.episodes is None:
             path = str(self.root / "data")
-            hf_dataset = load_dataset("parquet", data_dir=path, split="train")
+            # OpenPI exports may carry newer HF List metadata. The LeRobot
+            # schema describes the same values using this environment's types.
+            hf_dataset = load_dataset(
+                "parquet",
+                data_dir=path,
+                split="train",
+                features=get_hf_features_from_features(self.meta.features),
+            )
         else:
             files = [str(self.root / self.meta.get_data_file_path(ep_idx)) for ep_idx in self.episodes]
-            hf_dataset = load_dataset("parquet", data_files=files, split="train")
+            hf_dataset = load_dataset(
+                "parquet",
+                data_files=files,
+                split="train",
+                features=get_hf_features_from_features(self.meta.features),
+            )
 
         hf_dataset.set_transform(hf_transform_to_torch)
         return hf_dataset

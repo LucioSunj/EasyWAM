@@ -35,6 +35,8 @@ def setup_logging(
             "show_level": True,
             "show_path": True,
             "show_time": True,
+            # Rich hyperlink IDs consume Python's global RNG, including during state I/O.
+            "enable_link_path": False,
         }
         if rich_handler_kwargs:
             default_rich_kwargs.update(rich_handler_kwargs)

@@ -1,0 +1,541 @@
+{
+  "base_commit": "5aa63729250ecdf693cb6c553d7de8ad6eee30cf",
+  "base_tree": "60eb7ce3a78ec4063713205e0215708881c297a8",
+  "files": [
+    {
+      "path": "configs/data/real_world_fr3.yaml",
+      "mode": "100644",
+      "size": 2472,
+      "sha256": "0df53bf5f970fa100665ce1dfedd8eef8403faebd960a1225486b7d980ba0754",
+      "published_sha256": "0df53bf5f970fa100665ce1dfedd8eef8403faebd960a1225486b7d980ba0754"
+    },
+    {
+      "path": "configs/model/backbone/wan22.yaml",
+      "mode": "100644",
+      "size": 1522,
+      "sha256": "95250b8768584a2159cc7946a6e043086a08e8d66785d0324eb137e0bd5d3eeb",
+      "published_sha256": "95250b8768584a2159cc7946a6e043086a08e8d66785d0324eb137e0bd5d3eeb"
+    },
+    {
+      "path": "configs/task/real_world_fr3_fastwam_idm_wan22.yaml",
+      "mode": "100644",
+      "size": 488,
+      "sha256": "4a45c727342df7c93ccf237f0c0974315510fdf53dd96f2dadd29e1914039865",
+      "published_sha256": "4a45c727342df7c93ccf237f0c0974315510fdf53dd96f2dadd29e1914039865"
+    },
+    {
+      "path": "docs/README.md",
+      "mode": "100644",
+      "size": 2004,
+      "sha256": "e485c520ac23e4d2195ec77d65bfbfe9d0b31c75cff42646bd9163ba4ef3be4b",
+      "published_sha256": "e485c520ac23e4d2195ec77d65bfbfe9d0b31c75cff42646bd9163ba4ef3be4b"
+    },
+    {
+      "path": "docs/README_zh.md",
+      "mode": "100644",
+      "size": 1852,
+      "sha256": "d2b372c16fa0f8a0407e7be7eb32e6e1e12ab4c8a651292ebb3f6665bac635eb",
+      "published_sha256": "d2b372c16fa0f8a0407e7be7eb32e6e1e12ab4c8a651292ebb3f6665bac635eb"
+    },
+    {
+      "path": "docs/instructions/data/README.md",
+      "mode": "100644",
+      "size": 1078,
+      "sha256": "0b3c0aed8b4ca0c8f0f1c71dfb7674b01b2172972e404870989d554179c33f85",
+      "published_sha256": "0b3c0aed8b4ca0c8f0f1c71dfb7674b01b2172972e404870989d554179c33f85"
+    },
+    {
+      "path": "docs/instructions/data/README_zh.md",
+      "mode": "100644",
+      "size": 996,
+      "sha256": "cd01303b5df29d8b97984294b6ef9cd5a66cbb3b4a68b729c6b2cdfbdf1e5c1b",
+      "published_sha256": "cd01303b5df29d8b97984294b6ef9cd5a66cbb3b4a68b729c6b2cdfbdf1e5c1b"
+    },
+    {
+      "path": "docs/instructions/data/real_world_fr3.md",
+      "mode": "100644",
+      "size": 33039,
+      "sha256": "fae16406e70ed2488c9d99a534cbca644746a7751628691e4bdb49c4c5d42c25",
+      "published_sha256": "1a6a7ce4037a7bee4c846ad6f748c06ef376f6c874bea31016d960e8fbc30abf"
+    },
+    {
+      "path": "docs/instructions/data/real_world_fr3_zh.md",
+      "mode": "100644",
+      "size": 30189,
+      "sha256": "87de23821d41fc195631bd223cf96f1ec09719a0b062fbde33144d0506c0e6d6",
+      "published_sha256": "50bdb41d14a4283d923dcd9a3b2f92e1c4ae22b07e814042bc58773d3cbf8e04"
+    },
+    {
+      "path": "scripts/convert_real_world_fr3.py",
+      "mode": "100644",
+      "size": 10623,
+      "sha256": "9105f2c37b635be3ff0770322742eace0a037fb91a59710d6335b844184b36ea",
+      "published_sha256": "df75b8037ea167f45f7bffcf9ee02ef476c16310451454be5f340c39e4f4ab12"
+    },
+    {
+      "path": "scripts/precompute_text_embeds.py",
+      "mode": "100644",
+      "size": 19639,
+      "sha256": "cb644157ce61c12c5ac4cbf0e7f9c4d1aa921885b14cdc75586a513921a9fc88",
+      "published_sha256": "cb644157ce61c12c5ac4cbf0e7f9c4d1aa921885b14cdc75586a513921a9fc88"
+    },
+    {
+      "path": "scripts/preprocess_action_dit_backbone.py",
+      "mode": "100644",
+      "size": 14264,
+      "sha256": "c46676bf92587981abd4bdcd05f96783bad46cecd0758aadf56f97b839fbfcae",
+      "published_sha256": "c46676bf92587981abd4bdcd05f96783bad46cecd0758aadf56f97b839fbfcae"
+    },
+    {
+      "path": "scripts/run_real_world_fr3.py",
+      "mode": "100644",
+      "size": 8613,
+      "sha256": "c6236682f789d53ef7d51bd9bdb535e12db365e356cdb4e5b1518db9a5941504",
+      "published_sha256": "cfe26571212db7cdc30f107379781dbf91925e502e9339bba82a8bc6b2547e45"
+    },
+    {
+      "path": "scripts/run_real_world_fr3.sh",
+      "mode": "100755",
+      "size": 465,
+      "sha256": "976b03729fabf832a8c12c28e65cc2fbe08de0d56286335c7270eef74b4e52a0",
+      "published_sha256": "976b03729fabf832a8c12c28e65cc2fbe08de0d56286335c7270eef74b4e52a0"
+    },
+    {
+      "path": "scripts/train_real_world_fr3.sh",
+      "mode": "100755",
+      "size": 3060,
+      "sha256": "b5b3954ad148769ea7ff77e6b6fd9459018f481b177fd89ab98934bf3b034ca9",
+      "published_sha256": "c14afa314049c1532da49ff7593231a1be2057e2ae5f7ccddfc0d64ab7586cfe"
+    },
+    {
+      "path": "scripts/train_zero1.sh",
+      "mode": "100755",
+      "size": 2674,
+      "sha256": "58667af2554de7e59669bfc43734cd1ab1fd4149b0a74d983373e730faace7b5",
+      "published_sha256": "58667af2554de7e59669bfc43734cd1ab1fd4149b0a74d983373e730faace7b5"
+    },
+    {
+      "path": "src/data/lerobot/lerobot/lerobot_dataset.py",
+      "mode": "100644",
+      "size": 51280,
+      "sha256": "d21e9c2234203b5ca13549a157511cf1f12c5b7d56bff1caef9702bf712e60a5",
+      "published_sha256": "d21e9c2234203b5ca13549a157511cf1f12c5b7d56bff1caef9702bf712e60a5"
+    },
+    {
+      "path": "src/data/lerobot/processors/wam_processor.py",
+      "mode": "100644",
+      "size": 10768,
+      "sha256": "411663b1d745152521128a632aad8659c7d6d2a8a2eeb76c916e8bc7fb9a7091",
+      "published_sha256": "411663b1d745152521128a632aad8659c7d6d2a8a2eeb76c916e8bc7fb9a7091"
+    },
+    {
+      "path": "src/data/lerobot/robot_video_dataset.py",
+      "mode": "100644",
+      "size": 12801,
+      "sha256": "3e44d39d4296d2c1b4cc9af349049f3b33b721c7e7a0ef8dac70a4f403a90457",
+      "published_sha256": "3e44d39d4296d2c1b4cc9af349049f3b33b721c7e7a0ef8dac70a4f403a90457"
+    },
+    {
+      "path": "src/data/lerobot/transforms/relative_action.py",
+      "mode": "100644",
+      "size": 4627,
+      "sha256": "1837b77d87e257f0a10a5ad626875b87a9d3440d30262bbcea6be029300bbf88",
+      "published_sha256": "1837b77d87e257f0a10a5ad626875b87a9d3440d30262bbcea6be029300bbf88"
+    },
+    {
+      "path": "src/model/backbone/loader.py",
+      "mode": "100644",
+      "size": 4547,
+      "sha256": "f56a6e79fd675d2af6d2a7ac634e9fcc173576bdaa4f0b470e303fb9ef2bff78",
+      "published_sha256": "f56a6e79fd675d2af6d2a7ac634e9fcc173576bdaa4f0b470e303fb9ef2bff78"
+    },
+    {
+      "path": "src/model/backbone/wan22/loader.py",
+      "mode": "100644",
+      "size": 8712,
+      "sha256": "5571a485009b54efdf3175388688e6aa7247fe4ab2389fabf8bc3ef1a83506a9",
+      "published_sha256": "5571a485009b54efdf3175388688e6aa7247fe4ab2389fabf8bc3ef1a83506a9"
+    },
+    {
+      "path": "src/model/component/mot.py",
+      "mode": "100644",
+      "size": 36898,
+      "sha256": "d9c52ab4575aba680fded7a9cbc9873a9488277643c8dcfdadefb6cfbd087edf",
+      "published_sha256": "d9c52ab4575aba680fded7a9cbc9873a9488277643c8dcfdadefb6cfbd087edf"
+    },
+    {
+      "path": "src/model/easywam_mot.py",
+      "mode": "100644",
+      "size": 86152,
+      "sha256": "ad64ff9a851a0ee46a5c48b106e406149c01db302c39d3faed1fc725b84cedd1",
+      "published_sha256": "ad64ff9a851a0ee46a5c48b106e406149c01db302c39d3faed1fc725b84cedd1"
+    },
+    {
+      "path": "src/model/easywam_mot_idm.py",
+      "mode": "100644",
+      "size": 27353,
+      "sha256": "bd1efb8dbc89a0741a0f1ec720810e804d91cbb2329d54860ff57eb4b85b7576",
+      "published_sha256": "bd1efb8dbc89a0741a0f1ec720810e804d91cbb2329d54860ff57eb4b85b7576"
+    },
+    {
+      "path": "src/runtime.py",
+      "mode": "100644",
+      "size": 28311,
+      "sha256": "edebcdcee84f45a234de4002218f6d94e30ed943307d60b212d992e979f9be91",
+      "published_sha256": "edebcdcee84f45a234de4002218f6d94e30ed943307d60b212d992e979f9be91"
+    },
+    {
+      "path": "src/trainer.py",
+      "mode": "100644",
+      "size": 57191,
+      "sha256": "46f11f4a967d7ddf1e4f72a7d5b95e4585a9e4162f0f30120c0aa36a3b0452f1",
+      "published_sha256": "46f11f4a967d7ddf1e4f72a7d5b95e4585a9e4162f0f30120c0aa36a3b0452f1"
+    },
+    {
+      "path": "src/utils/logging_config.py",
+      "mode": "100644",
+      "size": 2751,
+      "sha256": "7f22ad62f82fc0087d600d91e09cf8ef5254652a560a6c9c8935fb97abf51a5f",
+      "published_sha256": "7f22ad62f82fc0087d600d91e09cf8ef5254652a560a6c9c8935fb97abf51a5f"
+    },
+    {
+      "path": "src/utils/samplers.py",
+      "mode": "100644",
+      "size": 2695,
+      "sha256": "b98297934bf509915b68bfe31c65931f9eafc49d0df3de80ff676185edf0f8ef",
+      "published_sha256": "b98297934bf509915b68bfe31c65931f9eafc49d0df3de80ff676185edf0f8ef"
+    },
+    {
+      "path": "tests/test_action_dit_preprocess_config.py",
+      "mode": "100644",
+      "size": 5030,
+      "sha256": "708da3a4221447de4277a743f105f78611bb38f446906367045228479fdc9aec",
+      "published_sha256": "708da3a4221447de4277a743f105f78611bb38f446906367045228479fdc9aec"
+    },
+    {
+      "path": "tests/test_checkpoint_completion.py",
+      "mode": "100644",
+      "size": 2529,
+      "sha256": "610cf30295e15c2513cd2fe14cd386cca442b16a3ec801fea5a6a29d24cd3631",
+      "published_sha256": "610cf30295e15c2513cd2fe14cd386cca442b16a3ec801fea5a6a29d24cd3631"
+    },
+    {
+      "path": "tests/test_checkpoint_retention.py",
+      "mode": "100644",
+      "size": 5844,
+      "sha256": "9a76250dd9ec0548154fad98e41d90cd7087b30179021e4b2ac217a008ddc58c",
+      "published_sha256": "9a76250dd9ec0548154fad98e41d90cd7087b30179021e4b2ac217a008ddc58c"
+    },
+    {
+      "path": "tests/test_convert_real_world_fr3.py",
+      "mode": "100644",
+      "size": 8642,
+      "sha256": "b2e60bdc9320002e868fefb0d59acc9ac3f74f32ecb0197a174edb7d6a6b4335",
+      "published_sha256": "b2e60bdc9320002e868fefb0d59acc9ac3f74f32ecb0197a174edb7d6a6b4335"
+    },
+    {
+      "path": "tests/test_deepspeed_accumulation_context.py",
+      "mode": "100644",
+      "size": 1392,
+      "sha256": "a83c92194f301d37ef5fa264aa41937aa7fbe12e49fbf8d27843bd4580b538d1",
+      "published_sha256": "a83c92194f301d37ef5fa264aa41937aa7fbe12e49fbf8d27843bd4580b538d1"
+    },
+    {
+      "path": "tests/test_fastwam_idm_review.py",
+      "mode": "100644",
+      "size": 4414,
+      "sha256": "c20cb9781721d7eaf53e7d4542f5b3c19d9173fc90e55eecf087f3ece8adc6a6",
+      "published_sha256": "c20cb9781721d7eaf53e7d4542f5b3c19d9173fc90e55eecf087f3ece8adc6a6"
+    },
+    {
+      "path": "tests/test_fixed_global_batch.py",
+      "mode": "100644",
+      "size": 1884,
+      "sha256": "1989dcfb8b2808049658be0420c7e8701c6db9a8b227cbd377d7189c11ce2102",
+      "published_sha256": "1989dcfb8b2808049658be0420c7e8701c6db9a8b227cbd377d7189c11ce2102"
+    },
+    {
+      "path": "tests/test_fr3_openpi_parquet_metadata.py",
+      "mode": "100644",
+      "size": 3161,
+      "sha256": "adf1f99fe2181be20489908c97fb7b7c18489a10435820c32b65cdcd5ca91955",
+      "published_sha256": "adf1f99fe2181be20489908c97fb7b7c18489a10435820c32b65cdcd5ca91955"
+    },
+    {
+      "path": "tests/test_fr3_postprocess_review.py",
+      "mode": "100644",
+      "size": 2423,
+      "sha256": "c1e67e096a6cb457fb3040089b2a4f7c92aa971caa2b05ec85bd420c3cab08e3",
+      "published_sha256": "c1e67e096a6cb457fb3040089b2a4f7c92aa971caa2b05ec85bd420c3cab08e3"
+    },
+    {
+      "path": "tests/test_fr3_training_launcher.py",
+      "mode": "100644",
+      "size": 6403,
+      "sha256": "d81d2bef756994c27e802711e727ab9d7351cbb0a06d5cb4edb6a30e4717aa58",
+      "published_sha256": "45bcd8bb685496283ff9d55ea57d4ff18b4e9a168cd158a9e1fa1c9a6f8f16c1"
+    },
+    {
+      "path": "tests/test_fr3_workflow.py",
+      "mode": "100644",
+      "size": 5900,
+      "sha256": "04d17054e1da77cd0545fbdc71e960a150d357c37bbd2f2d63fbbc8ef5a2fead",
+      "published_sha256": "04d17054e1da77cd0545fbdc71e960a150d357c37bbd2f2d63fbbc8ef5a2fead"
+    },
+    {
+      "path": "tests/test_logging_rng.py",
+      "mode": "100644",
+      "size": 865,
+      "sha256": "daea6063d5a6e2712d496265b9172fce2eb6076dc3051fc0d3b053eef9e2249d",
+      "published_sha256": "daea6063d5a6e2712d496265b9172fce2eb6076dc3051fc0d3b053eef9e2249d"
+    },
+    {
+      "path": "tests/test_precompute_text_embeds.py",
+      "mode": "100644",
+      "size": 7894,
+      "sha256": "cd16fcf5b62c084f3da261bde646fb4d0e0408133b3c7c095ce7193c363c2002",
+      "published_sha256": "cd16fcf5b62c084f3da261bde646fb4d0e0408133b3c7c095ce7193c363c2002"
+    },
+    {
+      "path": "tests/test_real_world_fr3.py",
+      "mode": "100644",
+      "size": 4039,
+      "sha256": "458c3a4af5cc840dbe2d3cd92bbe03e8ba3c68d34e8948f1ec590f173e777b6d",
+      "published_sha256": "458c3a4af5cc840dbe2d3cd92bbe03e8ba3c68d34e8948f1ec590f173e777b6d"
+    },
+    {
+      "path": "tests/test_sampler_resume.py",
+      "mode": "100644",
+      "size": 2533,
+      "sha256": "272b0c24d7b4837e2e258399155af0d74abf3197c505d5df96a6ce6e3aa03394",
+      "published_sha256": "272b0c24d7b4837e2e258399155af0d74abf3197c505d5df96a6ce6e3aa03394"
+    },
+    {
+      "path": "tests/test_selective_checkpointing.py",
+      "mode": "100644",
+      "size": 3096,
+      "sha256": "d42eb822a9363d05ab12e40b6afd863dc1ef23d63e3f14035ebbb4e2280661a0",
+      "published_sha256": "d42eb822a9363d05ab12e40b6afd863dc1ef23d63e3f14035ebbb4e2280661a0"
+    },
+    {
+      "path": "tests/test_training_entrypoint.py",
+      "mode": "100644",
+      "size": 4224,
+      "sha256": "8c63f1abb6e54962688caaf0791af9c2aa8e317518c06f4251f6fda8dbfbbe37",
+      "published_sha256": "8c63f1abb6e54962688caaf0791af9c2aa8e317518c06f4251f6fda8dbfbbe37"
+    },
+    {
+      "path": "tests/test_wan22_asset_paths.py",
+      "mode": "100644",
+      "size": 4057,
+      "sha256": "badb1cdfe98a36d13c06c5c31931698d90b5595b121e45dca0815f27ed76d9ea",
+      "published_sha256": "badb1cdfe98a36d13c06c5c31931698d90b5595b121e45dca0815f27ed76d9ea"
+    }
+  ],
+  "active_source_hashes": {
+    "configs/benchmark/sim_libero.yaml": "f68a8b7e0a574243eb34694ebc46886f323588f0cd2d7298e7aba152a27e2a3b",
+    "configs/benchmark/sim_libero_plus.yaml": "31163b5d7850950b02c3a59b3161ff5790b04d080ee47512c9df0a92915fcc36",
+    "configs/benchmark/sim_robocasa.yaml": "cf5f0caa26a0770c7022e90ec00f392f17098443b880cd2123a335684a9be5d8",
+    "configs/benchmark/sim_robodojo.yaml": "87b7d6a8cac899b0b98e5dbebb4b94e6bbf587faf268fbebf77342e4f012dbd3",
+    "configs/benchmark/sim_robotwin.yaml": "1750dbc49f7d1de3efd8afc40afedbb378f9451721e5a71ba337b6da93d7fe86",
+    "configs/data/libero.yaml": "db5e16655ca5fa97a6011c94a174d31e65c0aa2a934492e65dede8299eacbf77",
+    "configs/data/real_world_fr3.yaml": "0df53bf5f970fa100665ce1dfedd8eef8403faebd960a1225486b7d980ba0754",
+    "configs/data/robocasa.yaml": "cf6c562ca187e8d5dfbc4badc11291397e4268eff844c472191c0da168c55eb3",
+    "configs/data/robodojo.yaml": "f2b14a27886efac7d3f3d5e86958671b92c32ca754d8a56203306eec3644943d",
+    "configs/data/robotwin.yaml": "33b45009a55ca9e3cafe569391661c7c3f6d929afff6083175bde9e7c74aa357",
+    "configs/model/backbone/cosmos25.yaml": "2afd00fcaf791c6df7fa1fc43c8280a8280d98278e16c715c62495e39540a83e",
+    "configs/model/backbone/flux2_klein_4b.yaml": "3ecc8510f2303450d06d63110036ac1e554be0f2098c39739587cdf68f5620fe",
+    "configs/model/backbone/wan22.yaml": "95250b8768584a2159cc7946a6e043086a08e8d66785d0324eb137e0bd5d3eeb",
+    "configs/model/easywam_hidden_cosmos25.yaml": "cd32c3e8126dae8b70604d067678df60eebf56486d747672352709290473c0d6",
+    "configs/model/easywam_hidden_cosmos25_lora.yaml": "ff4947d58f6c5dfc5712c1d85df7cdaee35101fbc88f0bd9d02b560f5061f4bd",
+    "configs/model/easywam_hidden_wan22.yaml": "2e72d180c1d0f720004cf26b643992a898b266ec872c16efb3bf8875333af8e0",
+    "configs/model/easywam_hidden_wan22_lora.yaml": "d05ec3fe90d2a5452095c4f1070112999974962b0f56b7ed0779643fbbc4adf8",
+    "configs/model/easywam_mot_cosmos25.yaml": "1d483db8b3c9ea09c63674ec3ed902522c562c4972b1e3f887acf752bdfd85d2",
+    "configs/model/easywam_mot_cosmos25_lora.yaml": "6ba0dafb1ceaf7165c2b6750cedb94d2646a5447b48524daea280c154d924bdc",
+    "configs/model/easywam_mot_flux2_klein_4b.yaml": "b5a0e84d4f2fb087ea6217d9013c373bec44a60913da1a48e04b167b7864f428",
+    "configs/model/easywam_mot_idm_cosmos25.yaml": "3c192d6dca7bc86e75c89ce22ad05287f1c610fc617fc7cbcbecae9dd33a2f17",
+    "configs/model/easywam_mot_idm_cosmos25_lora.yaml": "e0f6418bb45583a667c26dfa2e3815d2b468be4029b0b6b3341466de88552163",
+    "configs/model/easywam_mot_idm_wan22.yaml": "40936f098170ce5853ed6b9110853619fc18fd25836403115e5042f05362f103",
+    "configs/model/easywam_mot_idm_wan22_lora.yaml": "a9a978d0d3acfdc98eeb4aa231506fb984848cadffebeaca734885cc1dd30905",
+    "configs/model/easywam_mot_joint_cosmos25.yaml": "cf807d97f9867933200fb3cab92026b7f391d64acddd0b162f568d9d2b06410a",
+    "configs/model/easywam_mot_joint_cosmos25_lora.yaml": "9dc01042518372a697e81ebaef452d37dd05d7e94290ec40d623af2846b0c8ad",
+    "configs/model/easywam_mot_joint_wan22.yaml": "36de93037b9a7afcdd6c0fb592f79a586442eef0e80f48d943d0ade8593ad440",
+    "configs/model/easywam_mot_joint_wan22_lora.yaml": "d632b6794b689e0a98dfc634135a3948172d6eccf699193d99e8f4588dd0e535",
+    "configs/model/easywam_mot_wan22.yaml": "bfbc8d9c638a4a5eb964f21a125e0f89e1aa9a124456a18fad1a6dbb28661dd1",
+    "configs/model/easywam_mot_wan22_lora.yaml": "4a5f378544db91cf5b27728535c995218197d13dff61df47ff9b8ec0efd9bfc2",
+    "configs/model/easywam_unified_cosmos25.yaml": "ed9470dc80aaaef7d80b6a78318fd1bef08f1f6e59362c275c524031caf00203",
+    "configs/model/easywam_unified_cosmos25_lora.yaml": "e2adfbe20612c5615d853777d3f6a03ba8544c963aee7de2aea4aebaead0e913",
+    "configs/model/easywam_unified_wan22.yaml": "7fb3776c60b33b96e72be6c9893f83e6f1fd859365ced9a3183955eeee72ee85",
+    "configs/model/easywam_unified_wan22_lora.yaml": "366cc89548798bbced16cad9b9e04729bf36424405b6100ebc254e8ccddd7b00",
+    "configs/model/fastwam_idm_wan22.yaml": "b8fe359587dae1aad4af95df285fa78e6180d4314ea47977f3efbbf2b791e187",
+    "configs/model/fastwam_joint_wan22.yaml": "78796b600f0897237ce1f690bdef42960b703f0274fcf38025afa1ffe7648e5d",
+    "configs/model/fastwam_wan22.yaml": "42a9340e5688e237cf48aebb5abb4ecbe270ef841553eec1772390f8674213fb",
+    "configs/model/lora/video_dit.yaml": "24e1d0faa0390679aa3b0e0fe4774256b0076c56d93995337e4ce1d3851f9db1",
+    "configs/task/libero_easywam_hidden_cosmos25.yaml": "f5120dbf8c1f09514829f9b5048ceb0b4e7c4196c6fdfded18ce3ce358c09c42",
+    "configs/task/libero_easywam_hidden_cosmos25_lora.yaml": "557c976a6ec3cbf2ce6f9a55b66eb8b38c0ba75325762f9734cce96ac8490cd9",
+    "configs/task/libero_easywam_hidden_wan22.yaml": "b707eea2c11d40b2415d333d1175fc0592eef967723ea60e28ff1413f756c063",
+    "configs/task/libero_easywam_hidden_wan22_lora.yaml": "b769bcaa602fb66bdf9bb306beb1c5e7fa494645c3ed2247bb83ee90eca664aa",
+    "configs/task/libero_easywam_mot_cosmos25.yaml": "b7d517773819ff503aa9c1c6a27414e3406c8eb25b073965a8c014f7aaa0b97d",
+    "configs/task/libero_easywam_mot_cosmos25_lora.yaml": "ed58e9a6c35e4bb3fd431df1d6cae5ce8c2688957b65f156a3743602eb193ee8",
+    "configs/task/libero_easywam_mot_flux2_klein_4b.yaml": "1f141b817ea513d73f0fd0027f4032f1314e56a0c284b14e38894a8bacfb5b4a",
+    "configs/task/libero_easywam_mot_idm_cosmos25.yaml": "e35a2c3554ec6890a7775e622a1f906c386a927aee7fa252721df27c810f5bf4",
+    "configs/task/libero_easywam_mot_idm_cosmos25_lora.yaml": "19a66144c3afc94f1ebf49b301706f43045ec8cfe42b2e8d89a9089ddb0e7d16",
+    "configs/task/libero_easywam_mot_idm_wan22.yaml": "062b2ed280aea529cc67e777c26e81dc1492f1b5d812e97d5eb8c16c12b78940",
+    "configs/task/libero_easywam_mot_idm_wan22_lora.yaml": "89f4a02dbfb06be9f7d90d89fe4db9d79812fbcc227e2d930e20870114baa6f3",
+    "configs/task/libero_easywam_mot_joint_cosmos25.yaml": "1e52a5e121642bda4c524ae46338617a19a73dc08227128f2cdb99f843b9a35b",
+    "configs/task/libero_easywam_mot_joint_cosmos25_lora.yaml": "2b90f10b434fcdfa1fe1d450511b7d6b372f8a7a78ebb095b234317603ebd67f",
+    "configs/task/libero_easywam_mot_joint_wan22.yaml": "20e40ba2f4ddadae376236b9e32aa7cfee08ec17d9792169f2135affce54823c",
+    "configs/task/libero_easywam_mot_joint_wan22_lora.yaml": "92369bd3d0a7ee3f2a62e4ea228b63a7c5c4d92fbbcdc9598373a1f383b40696",
+    "configs/task/libero_easywam_mot_wan22.yaml": "0b8d9500cbca5410d1408b0249529a1bce764a53a51b45d8669aab600dfa19d4",
+    "configs/task/libero_easywam_mot_wan22_lora.yaml": "7c2363baa11f3ab1a1234390a6ce1df6995e6c0222fc2b3672bfcdd74ca8f2aa",
+    "configs/task/libero_easywam_unified_cosmos25.yaml": "dca107476cfe4f893bab394a938e18d4df6dbbedc507d02a784173edd68530a4",
+    "configs/task/libero_easywam_unified_cosmos25_lora.yaml": "5a50ed50b6b30c8ed195c018bf095eec4d94c5ee1745adc6af7dbf6612d786dc",
+    "configs/task/libero_easywam_unified_wan22.yaml": "b548953626e2c01f17787713570ff83441ca38ff60220ec025e751103b2ae800",
+    "configs/task/libero_easywam_unified_wan22_lora.yaml": "78040e8ec250803ea32e76326aca72cf8e61a29b6bdb990f9480ccd9612cda34",
+    "configs/task/libero_fastwam_idm_mixed_parent.yaml": "ef402d8fceb15770ad0ea2d9dd1bc087b7ba62c99859e98cf5c68e766b24bdf3",
+    "configs/task/libero_fastwam_idm_wan22.yaml": "f1185b33085854c04654a0230b928f0a82d33805440740723e510c352d924e6f",
+    "configs/task/libero_fastwam_joint_wan22.yaml": "db60c81718131b226777fc6aa400552f2c3d7cae3992d85e1b6e3d335f1069ab",
+    "configs/task/libero_fastwam_wan22.yaml": "8ec7958c40ab0776745722a7a8e4d32f13f900d569435e72bae468316a54ec41",
+    "configs/task/real_world_fr3_fastwam_idm_wan22.yaml": "4a45c727342df7c93ccf237f0c0974315510fdf53dd96f2dadd29e1914039865",
+    "configs/task/robocasa_easywam_hidden_wan22.yaml": "1a4f9251531ac7eaf8fe5e633b8d7f040868a5060c371165fbaaa554b88cfc40",
+    "configs/task/robocasa_easywam_mot_idm_wan22.yaml": "38aee000f7936ce940337b9ef403e7a0e00d1fb79fbaa48d006bb3e98e0ce1f2",
+    "configs/task/robocasa_easywam_mot_joint_wan22.yaml": "9463c6626a0781bde01a0937531eb9f81ced369351d2a8efc934f6c7baf223bd",
+    "configs/task/robocasa_easywam_mot_wan22.yaml": "b508ed0ee907334aad28b8872782cc0574e08001dc6e6e1da45b73d417d8ab0f",
+    "configs/task/robocasa_easywam_unified_wan22.yaml": "8370b0d68f822dacf6499d133c328aaa575c050f24b3535afa4b12738dbe4328",
+    "configs/task/robodojo_easywam_hidden_wan22.yaml": "13cde03ed784baf3d75d87b3325a03f076189915347bd98221c077fdaf887f9d",
+    "configs/task/robodojo_easywam_mot_idm_wan22.yaml": "fcfd1f65063e2b12aa7fc01be785b065669830887405223973ca4a71c6ef66cb",
+    "configs/task/robodojo_easywam_mot_joint_wan22.yaml": "14342e42133b3468c52d7741d8d7c39984480a2cb9f5a8902b882f2d75efbbb4",
+    "configs/task/robodojo_easywam_mot_wan22.yaml": "8d8539492ff054078be65a917662dfb5c323d93fb4cd2ce89c8029a7e7c37e6e",
+    "configs/task/robodojo_easywam_unified_wan22.yaml": "aa010f5b70de8932d587d49e5fd3680db0c9f51c870fbfe4d5d496ebd56419e9",
+    "configs/task/robotwin_easywam_hidden_wan22.yaml": "3712e833c3260712aa740e53f0185cc295c12c01b85c32e26cfc014dc5dad07f",
+    "configs/task/robotwin_easywam_mot_idm_wan22.yaml": "7f4f72b6e2cf8a36946d1d64aaaebc1c824301a267a176b2aa3c919ce9b5238d",
+    "configs/task/robotwin_easywam_mot_joint_wan22.yaml": "c1fc681d716e6c95ac857b5ec85d768a5e693b5e7316d08bcf39e2ff231912fc",
+    "configs/task/robotwin_easywam_mot_wan22.yaml": "4cf12c2c2964a4e6a68a865097c6e1721252b990bc3bb6c3ae06271292e93cff",
+    "configs/task/robotwin_easywam_unified_wan22.yaml": "e0f34a4279db616adaf58da5f064d5bbf004f4426c3d13f9cf2e6463ed89534a",
+    "configs/task/robotwin_fastwam_idm_wan22.yaml": "6e82596acc639774be99c405b529a3cef887ce9014add82a48e6b0f546373bb7",
+    "configs/task/robotwin_fastwam_joint_wan22.yaml": "251b3e39360c471f723e5f67c3ff1a37c042f3febcdb1765ba2b01f97773edd6",
+    "configs/task/robotwin_fastwam_wan22.yaml": "faf17ecea771f297e6fd61714f7ce90011cacc62c2ddd2247d1f8d01cc2e35d5",
+    "configs/train.yaml": "008f780c4eb91c3b32793370bb7f670c3e489ada8e2957c4bbce4203cf97478e",
+    "scripts/__init__.py": "2e839e0701e3f2efb66ee97aab0ea6f021c4ad315beb15b46f47f01270f6f249",
+    "scripts/accelerate_configs/accelerate_zero0.yaml": "dacdf1cee3675246567f1f61e943c6762a4700b8b40c888af8fdf89773adc35b",
+    "scripts/accelerate_configs/accelerate_zero1_ds.yaml": "5b9e24f38c199fdff6bbd17981d86e2624f855f707660094c99f711efc8e0833",
+    "scripts/accelerate_configs/accelerate_zero2_ds.yaml": "3b838fbf44cd279613797e9ac3265f306806391963be593cb47787d38240a2e1",
+    "scripts/accelerate_configs/accelerate_zero2_offload_ds.yaml": "a23b837744bd06a138cb1964036b311377d9c7d194f67041c3978ddaf595f527",
+    "scripts/convert_lerobot_v21_to_v30.py": "32816d0a315c7ec04a56bf76167b5ceb2a1e2ebe75be95ec4ee3cd2d7c08c54b",
+    "scripts/convert_real_world_fr3.py": "9105f2c37b635be3ff0770322742eace0a037fb91a59710d6335b844184b36ea",
+    "scripts/ds_configs/ds_zero1_config.json": "ad2937d5fe850cf96bd0ccc1fd4cb4603844d7ab81cda0f387225c282aa26b64",
+    "scripts/ds_configs/ds_zero2_config.json": "737bc6fbf0aceb8b10669cf7732db474c602884e56ddbe815689ca2b4e905c70",
+    "scripts/ds_configs/ds_zero2_offload_config.json": "a95e3a00e1d1bafb5f143bbfadf671ecf8fbfa42cc6ab002d6df61818ad0b231",
+    "scripts/precompute_text_embeds.py": "cb644157ce61c12c5ac4cbf0e7f9c4d1aa921885b14cdc75586a513921a9fc88",
+    "scripts/preprocess_action_dit_backbone.py": "c46676bf92587981abd4bdcd05f96783bad46cecd0758aadf56f97b839fbfcae",
+    "scripts/run_real_world_fr3.py": "c6236682f789d53ef7d51bd9bdb535e12db365e356cdb4e5b1518db9a5941504",
+    "scripts/train.py": "0954b433d48597e5b894f683cd8035648e57289c8c5b60ef89a00bfa6341504e",
+    "scripts/tune_eval_concurrency.py": "879574740dba1f6d57af6b7e47a6ceec9e5c32872d1ee622bbc1e2b723202ec5",
+    "src/data/__init__.py": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "src/data/dataset_utils.py": "8f8dd349192f862dbfd58405d190deed57bc62ae7c8e3d4f2fbd9770f25056ea",
+    "src/data/lerobot/base_lerobot_dataset.py": "097657610c397ba725ce9cf0fc532b2006270dfa4ef7e01db26b5aef030f5e5f",
+    "src/data/lerobot/constants.py": "11ac9260341e1560c5eb0dd7acb79ed63c74180b8ab4113c27622ff213db417f",
+    "src/data/lerobot/lerobot/datasets/compute_stats.py": "f87dab91fbe907b7d4dc01643b888fdf8cac523b63d174d97a17da05b8109a82",
+    "src/data/lerobot/lerobot/datasets/utils.py": "085515aa28ca60c11f69e5f7be65978946505cf67c80c1572cddae5a44943e78",
+    "src/data/lerobot/lerobot/datasets/video_utils.py": "c5b7b573cc5dfdf05d3c38baa8f3e2356f30cd29052fea60c0baa18316f9b211",
+    "src/data/lerobot/lerobot/lerobot_dataset.py": "d21e9c2234203b5ca13549a157511cf1f12c5b7d56bff1caef9702bf712e60a5",
+    "src/data/lerobot/processors/base_processor.py": "2b9cd33c7250b69314ff23838170c00700e5a3287f1b0bb5ea73017102c8e41c",
+    "src/data/lerobot/processors/wam_processor.py": "411663b1d745152521128a632aad8659c7d6d2a8a2eeb76c916e8bc7fb9a7091",
+    "src/data/lerobot/prompts.py": "b9793779314a17b14a08526babbfb7d07f8f9045f762f023dba7c15789c1d211",
+    "src/data/lerobot/robot_video_dataset.py": "3e44d39d4296d2c1b4cc9af349049f3b33b721c7e7a0ef8dac70a4f403a90457",
+    "src/data/lerobot/text_embedding_cache.py": "7035bdb675f4e3485865ba2661c845f529d3e5bf7f3ce97ed2d6e6ce47ac111e",
+    "src/data/lerobot/transforms/action_state_merger.py": "669d6991415fc5eca44b32b129d15fee1e06e2f17d59d90350c252598033b427",
+    "src/data/lerobot/transforms/image.py": "4d7ab61d0844918525244db653831f0f632730046b2714a6163ff57c441a16fa",
+    "src/data/lerobot/transforms/misc.py": "8b505bd9e3a54ab2db7efcd64f0929d2e0303f5db1123de1074fd01fa9887e2b",
+    "src/data/lerobot/transforms/relative_action.py": "1837b77d87e257f0a10a5ad626875b87a9d3440d30262bbcea6be029300bbf88",
+    "src/data/lerobot/transforms/rotation.py": "0de34b252d60b956cda07c0c19baebbd3c8a28916face700c6664c5815e11e91",
+    "src/data/lerobot/utils/normalizer.py": "bd932bd139db4190f88b691125a1f50788b6d9130b94167bc52804e05042d6a8",
+    "src/data/lerobot/utils/rotation.py": "ca6890cc3bf2a5b333ea50fa155677096df2dda62ecaa32495a43a974b24714c",
+    "src/model/__init__.py": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "src/model/backbone/__init__.py": "0ec027e62ca2ca0b22814e74113b3df7865d2f8ee27151c8b28ac10fcb2b8027",
+    "src/model/backbone/contract.py": "56bcd988393de18d8fe590b01a4c6bae070f61f3bb12400257b6369585c1edcd",
+    "src/model/backbone/cosmos25/__init__.py": "0fbbfe6914beceecafae3480dcfecdc1e9edf5edae03afb916f5a6fae5fcebf0",
+    "src/model/backbone/cosmos25/cosmos25_core.py": "5f50e6a017593722663b09096554aee2c48d47fd8630d65ceedc03513a36909d",
+    "src/model/backbone/cosmos25/cosmos_vae_arch.py": "c1822533bd0d486cbe1d3062aab7132261f994ef4f04eb41523133328dd8731b",
+    "src/model/backbone/cosmos25/cosmos_video_dit.py": "4ddcbd3c58bd0a411565a0573b4afe36f327a6c517f22c44977aed6af2cd3d48",
+    "src/model/backbone/cosmos25/cosmos_video_text_encoder.py": "a932808714f7e378543ac34faca29f75e84f8c9740a5b8657c649bf0039b886d",
+    "src/model/backbone/cosmos25/cosmos_video_vae.py": "2da967c19c4f9ade0427fc8c4032b2e2c7398e5ad50c54d24ce50ffb10e9a0f8",
+    "src/model/backbone/cosmos25/loader.py": "8badea0a930dcc142cff2be0a2c17d27ef5210e7314330161c6aa77611557b79",
+    "src/model/backbone/flux2/__init__.py": "729627c20303b85f7b1ba76bf5392e8ec1b29e5d874b886f668d1c9f189b9562",
+    "src/model/backbone/flux2/checkpoint.py": "eb079ccd58fa514e8391aad4a16a446548536ca095366d7d5377886a36d6e054",
+    "src/model/backbone/flux2/flux2_video_expert.py": "026cc9382b1f17de70b6c75a050b039291a3b8775f766254af59756f7730d901",
+    "src/model/backbone/flux2/imports.py": "753febea3fce52d7d1702d0a9b2689ebdc40a9c1826550b2ccbaa41cdfa9adc0",
+    "src/model/backbone/flux2/loader.py": "878c6908e42fcc51cb43c843981c1eb14f47788e9e7dcd6367f94f7f45005e1b",
+    "src/model/backbone/flux2/text_encoder.py": "bcc8de300d127e24a411fe8e1936b0779c83e3d4620ca644b32a739f31c9587f",
+    "src/model/backbone/loader.py": "f56a6e79fd675d2af6d2a7ac634e9fcc173576bdaa4f0b470e303fb9ef2bff78",
+    "src/model/backbone/protocol.py": "023cbbc686c43f964901ffc37a41be3b284e479a13b856168dea28a0519fa42d",
+    "src/model/backbone/wan22/__init__.py": "1ca2465f3483a15f2903f6831d6f319b20a733398afb519a85d33293d1ceba74",
+    "src/model/backbone/wan22/loader.py": "5571a485009b54efdf3175388688e6aa7247fe4ab2389fabf8bc3ef1a83506a9",
+    "src/model/backbone/wan22/wan22_core.py": "1fe88192a889710820546de1c560759b33e6ea70d9a15d9d64fd9c986c4dff58",
+    "src/model/backbone/wan22/wan_video_dit.py": "474048bd0983f17b20f8eb99daacb39f553a493245fbe38e5c2aa4b7406171b6",
+    "src/model/backbone/wan22/wan_video_text_encoder.py": "bd85b94523b4fdb73203a4f52c5fb1b4bc88e93d0e2778ba7886004223d0b6ac",
+    "src/model/backbone/wan22/wan_video_vae.py": "bf7a9df12974d386dd3830436e400f1c67f2ab670969ed742227958943ab86a5",
+    "src/model/component/__init__.py": "6f463bf0cc8bc56bc8f45c60f61d7759bdac4a06dfbefdaac44195ccaac88fee",
+    "src/model/component/action_dit.py": "483c070319a175b957125c7523e340fafcb343961e29e5e3b61c227ab7b6d8ef",
+    "src/model/component/action_dit_flux2.py": "1098543b84b2e95dbc8243203418745034ecad13930f8268c6b0f6148b417c96",
+    "src/model/component/attention.py": "636222b989b1318e9c2fae5ac1560c9fdbcbe3941c998a598d5a650408bc914d",
+    "src/model/component/lora.py": "e18281796adb3cf3a9b7b8f8538287c21ba74b896ba98a00caaf071c05b9b7ab",
+    "src/model/component/mot.py": "d9c52ab4575aba680fded7a9cbc9873a9488277643c8dcfdadefb6cfbd087edf",
+    "src/model/easywam_hidden.py": "3c4d66adf550abf3cdbeaf7948ff716d84b8ffa764bce06002a304aeca13696c",
+    "src/model/easywam_mot.py": "ad64ff9a851a0ee46a5c48b106e406149c01db302c39d3faed1fc725b84cedd1",
+    "src/model/easywam_mot_idm.py": "bd1efb8dbc89a0741a0f1ec720810e804d91cbb2329d54860ff57eb4b85b7576",
+    "src/model/easywam_mot_joint.py": "cb67d8c87b97c68e2a3dea69e9ac69addb82e3121879c99c452604c72ca22dde",
+    "src/model/easywam_unified.py": "3f3a63fe9965df3d86a6876982c3a051745da0b8e9ca96380eccfbb9b3d1b416",
+    "src/model/fastwam.py": "a6fc316765f3e8058898a469b7f8a0ed96b012cd237f66213d859eebfd5afdbe",
+    "src/model/helpers/__init__.py": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "src/model/helpers/batching.py": "38625c66266c6ce8a4bbc024c73787d39c5780c667774ef4ffd61a0905347277",
+    "src/model/helpers/gradient.py": "ba5d8f7272eb029dc6cd2849ca99b70f6ad5abb838d21c818beb0590620dc793",
+    "src/model/helpers/inference.py": "3af4d6c8b782886dada165cda87351e42d05f9bac1e82b890eca2006c6b0c93b",
+    "src/model/helpers/io.py": "34faa89ea92a0b366ecd336dcd969155f25da9359e2075b502ffa49fe3b369b4",
+    "src/model/helpers/state_dict_converters.py": "81d213373e5056a8d8bf31768b9b04164138ea78d0b306e316334841499f4bf9",
+    "src/model/schedulers/__init__.py": "3e15283fa2f44d445cac1bab8dc1f2aa77072dca6be7b18319311f842fcc85af",
+    "src/model/schedulers/scheduler_continuous.py": "ec5e824320ebfb0d7b4ff46bd8f93cef2981f63d492775f7e79a6f71a05ab1fb",
+    "src/model/schedulers/scheduler_flow_unipc.py": "3bfac5d7d08fcf5467c08e9dd9dcfcade4a80a4230d34c2b4d9c7672c8ba3a99",
+    "src/runtime.py": "edebcdcee84f45a234de4002218f6d94e30ed943307d60b212d992e979f9be91",
+    "src/trainer.py": "46f11f4a967d7ddf1e4f72a7d5b95e4585a9e4162f0f30120c0aa36a3b0452f1",
+    "src/utils/__init__.py": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "src/utils/config_resolvers.py": "62e27a967eeac1f985d1eaeb37f32e5d63f6cbdac3282f89a8492c01db444b73",
+    "src/utils/fs.py": "69e6df236b43360428a613686c8f37c531c0d16a3a2c5b06a725c46b49d657c5",
+    "src/utils/logging_config.py": "7f22ad62f82fc0087d600d91e09cf8ef5254652a560a6c9c8935fb97abf51a5f",
+    "src/utils/misc.py": "05aa51247936a8d3faac27f90b78b65ff83a688259bed55d114b6a617ced532d",
+    "src/utils/pytorch_utils.py": "ffc483e7fb435cd654326750eaffdbfc9243837c3140dcc74e45b24abb751a33",
+    "src/utils/samplers.py": "b98297934bf509915b68bfe31c65931f9eafc49d0df3de80ff676185edf0f8ef",
+    "src/utils/video_io.py": "9e9898b021a44e87aa1b4e6d13e3755a9869a2e27a7eb53c72a6802808d5bd80",
+    "src/utils/video_metrics.py": "aaa37e458cc9e4bb79a17923b5ff5900c97b4309f7abd50db44cf76e9143ffd6"
+  },
+  "original_runtime_config_sha256": "e140a52eb3facdb71e866d9c5c073c769ecd8bb7d8bd09a4257ba42456604987",
+  "active_checkout_unchanged": true,
+  "publication_redactions": {
+    "paths": [
+      "docs/instructions/data/real_world_fr3.md",
+      "docs/instructions/data/real_world_fr3_zh.md",
+      "scripts/convert_real_world_fr3.py",
+      "scripts/run_real_world_fr3.py",
+      "scripts/train_real_world_fr3.sh",
+      "tests/test_fr3_training_launcher.py"
+    ],
+    "categories": [
+      "internal storage roots",
+      "raw dataset example names",
+      "two physical camera identifiers"
+    ],
+    "only_literal_metadata_substitutions": true,
+    "frozen_config_only_path_values_changed": true,
+    "frozen_config_environment_variables": [
+      "FR3_ACTION_DIT_PATH",
+      "FR3_FINAL_DATASET_DIR",
+      "FR3_OUTPUT_DIR",
+      "FR3_TEXT_CACHE",
+      "WAN22_ROBOT_DIR",
+      "WAN22_ROBOT_DIT",
+      "WAN22_T5_PATH",
+      "WAN22_TOKENIZER_DIR",
+      "WAN22_VAE_PATH"
+    ]
+  }
+}

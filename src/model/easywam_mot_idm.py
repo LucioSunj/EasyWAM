@@ -140,7 +140,45 @@ class EasyWAMMoTIDM(EasyWAMMoTJoint):
             device=device,
         )
 
+    @staticmethod
+    def _canonicalize_padded_video(sample):
+        padding = sample.get("image_is_pad")
+        if padding is None or not bool(padding.any()):
+            return sample
+        video = sample["video"]
+        if padding.ndim != 2 or tuple(padding.shape) != (video.shape[0], video.shape[2]):
+            raise ValueError("Video padding must have shape [B, T].")
+        padding = padding.to(device=video.device, dtype=torch.bool)
+        positions = torch.arange(video.shape[2], device=video.device).expand(video.shape[0], -1)
+        latest = positions.masked_fill(padding, -1).cummax(dim=1).values
+        indices = latest.clamp_min(0)[:, None, :, None, None].expand_as(video)
+        # A partially valid VAE latent must not encode arbitrary padded pixels.
+        canonical = video.gather(2, indices)
+        canonical = canonical.masked_fill((latest < 0)[:, None, :, None, None], 0)
+        return dict(sample, video=canonical)
+
+    def _mask_padded_training_keys(self, mask, inputs, video_seq_len, tokens_per_frame, action_seq_len):
+        image_pad, action_pad = inputs["image_is_pad"], inputs["action_is_pad"]
+        if not any(pad is not None and bool(pad.any()) for pad in (image_pad, action_pad)):
+            return mask
+        batch_size = inputs["input_latents"].shape[0]
+        device = inputs["input_latents"].device
+        video_valid = torch.ones(batch_size, video_seq_len, dtype=torch.bool, device=device)
+        if image_pad is not None:
+            factor = int(self.vae.temporal_downsample_factor)
+            tail_pad = image_pad[:, 1:].reshape(batch_size, -1, factor).all(dim=2)
+            latent_valid = ~torch.cat([image_pad[:, :1], tail_pad], dim=1)
+            video_valid = latent_valid.repeat_interleave(tokens_per_frame, dim=1)
+            if video_valid.shape[1] != video_seq_len:
+                raise ValueError("Video padding does not match the latent token sequence.")
+        action_valid = torch.ones(batch_size, action_seq_len, dtype=torch.bool, device=device)
+        if action_pad is not None:
+            action_valid[:, :action_pad.shape[1]] = ~action_pad
+        valid_keys = torch.cat([video_valid, video_valid, action_valid], dim=1)
+        return mask.dense[None] & valid_keys[:, None, :]
+
     def training_loss(self, sample):
+        sample = self._canonicalize_padded_video(sample)
         inputs = self.build_inputs(sample)
         input_latents = inputs["input_latents"]
         batch_size = input_latents.shape[0]
@@ -259,6 +297,10 @@ class EasyWAMMoTIDM(EasyWAMMoTJoint):
             noisy_video_tokens_per_frame=noisy_tokens_per_frame,
             cond_video_tokens_per_frame=cond_tokens_per_frame,
             device=merged_video_tokens.device,
+        )
+        attention_mask = self._mask_padded_training_keys(
+            attention_mask, inputs, noisy_video_seq_len, noisy_tokens_per_frame,
+            action_pre["tokens"].shape[1],
         )
         tokens_out = self.mot(
             embeds_all={"video": merged_video_tokens, "action": action_pre["tokens"]},

@@ -1,3 +1,11 @@
+"""Cache text embeddings; optional text_encoder_device/dtype/path overrides.
+
+For CPU Wan encoding, pass ``++text_encoder_device=cpu`` and
+``++text_encoder_dtype=float32``. ``model.backbone.text_encoder_path``
+selects a separate Wan T5 checkpoint; ``model.backbone.tokenizer_model_id``
+continues to select the tokenizer directory. Stored contexts remain bfloat16.
+"""
+
 import logging
 import os
 import re
@@ -8,11 +16,8 @@ from typing import Any
 import hydra
 import torch
 import torch.distributed as dist
-from omegaconf import DictConfig, ListConfig
-from tqdm import tqdm
-
-from data.lerobot.robot_video_dataset import DEFAULT_PROMPT
 from data.lerobot.lerobot.datasets.utils import load_info, load_tasks, load_tasks_v21
+from data.lerobot.robot_video_dataset import DEFAULT_PROMPT
 from data.lerobot.text_embedding_cache import (
     build_text_embedding_payload,
     prompt_hash,
@@ -20,6 +25,8 @@ from data.lerobot.text_embedding_cache import (
 )
 from model.backbone.wan22.loader import _load_registered_model, _resolve_configs
 from model.backbone.wan22.wan_video_text_encoder import HuggingfaceTokenizer
+from omegaconf import DictConfig, ListConfig
+from tqdm import tqdm
 from utils.config_resolvers import register_default_resolvers
 from utils.logging_config import get_logger, setup_logging
 
@@ -32,15 +39,39 @@ DEFAULT_CONTEXT_LEN = 128
 DEFAULT_BATCH_SIZE = 16
 
 
-def _init_distributed():
+def _resolve_compute_settings(cfg: DictConfig) -> tuple[str, torch.dtype]:
+    device = str(cfg.get("text_encoder_device", "auto"))
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    if device == "cuda" and int(os.environ.get("WORLD_SIZE", "1")) > 1:
+        device = f"cuda:{int(os.environ.get('LOCAL_RANK', '0'))}"
+    if torch.device(device).type not in {"cpu", "cuda"}:
+        raise ValueError("`text_encoder_device` must be auto, cpu, cuda, or cuda:N.")
+
+    dtype_name = str(cfg.get("text_encoder_dtype", "bfloat16"))
+    dtypes = {
+        "float32": torch.float32,
+        "float16": torch.float16,
+        "bfloat16": torch.bfloat16,
+    }
+    if dtype_name not in dtypes:
+        raise ValueError(
+            f"Unsupported text_encoder_dtype={dtype_name!r}; "
+            f"choose from {', '.join(dtypes)}."
+        )
+    return device, dtypes[dtype_name]
+
+
+def _init_distributed(device: str):
     world_size = int(os.environ.get("WORLD_SIZE", "1"))
     if world_size <= 1:
         return False, 0, 1, 0
 
     local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-    backend = "nccl" if torch.cuda.is_available() else "gloo"
-    if torch.cuda.is_available():
-        torch.cuda.set_device(local_rank)
+    use_cuda = torch.device(device).type == "cuda"
+    backend = "nccl" if use_cuda else "gloo"
+    if use_cuda:
+        torch.cuda.set_device(device)
 
     if not dist.is_initialized():
         dist.init_process_group(backend=backend, init_method="env://")
@@ -202,10 +233,11 @@ def _cache_payload(
 def main(cfg: DictConfig):
     setup_logging(log_level=logging.INFO)
 
-    is_distributed, rank, world_size, local_rank = _init_distributed()
+    device, torch_dtype = _resolve_compute_settings(cfg)
+    is_distributed, rank, world_size, _ = _init_distributed(device)
     if is_distributed and rank == 0:
         logger.info("Distributed enabled: world_size=%d", world_size)
-    if (not is_distributed) and torch.cuda.is_available() and torch.cuda.device_count() > 1:
+    if (not is_distributed) and device.startswith("cuda") and torch.cuda.device_count() > 1:
         logger.info(
             "Multi-GPU available. To use it, run: torchrun --standalone --nproc_per_node=%d scripts/precompute_text_embeds.py",
             torch.cuda.device_count(),
@@ -235,11 +267,6 @@ def main(cfg: DictConfig):
         logger.warning("No prompts found in the configured datasets; nothing to do.")
         return
 
-    if torch.cuda.is_available():
-        device = f"cuda:{local_rank}" if is_distributed else "cuda"
-    else:
-        device = "cpu"
-    torch_dtype = torch.bfloat16
     backbone_cfg = model_cfg.get("backbone")
     if backbone_cfg is None:
         raise ValueError("`cfg.model.backbone` is required.")
@@ -247,8 +274,15 @@ def main(cfg: DictConfig):
     model_id = str(backbone_cfg.get("model_id", DEFAULT_MODEL_ID))
     enc_id = str(backbone_cfg.get("text_encoder_id", _model_id_to_enc_id(model_id)))
 
+    text_encoder_path = backbone_cfg.get("text_encoder_path")
+    if text_encoder_path is not None and backbone_name != "wan22":
+        raise ValueError("`model.backbone.text_encoder_path` is only supported for Wan2.2.")
     if backbone_name == "wan22":
-        text_encoder_model_id = model_id
+        text_encoder_model_id = (
+            str(Path(str(text_encoder_path)).expanduser())
+            if text_encoder_path is not None
+            else model_id
+        )
         tokenizer_model_id = str(
             backbone_cfg.get("tokenizer_model_id", DEFAULT_TOKENIZER_MODEL_ID)
         )
@@ -266,71 +300,6 @@ def main(cfg: DictConfig):
             raise ValueError("FLUX.2 text cache requires text_encoder_id=qwen3_flux2.")
     else:
         raise ValueError(f"Unsupported backbone for text caching: {backbone_name!r}")
-
-    logger.info(
-        "Preparing text encoder for backbone=%s with text_encoder_model_id=%s "
-        "tokenizer_model_id=%s device=%s dtype=%s context_len=%d overwrite=%s",
-        backbone_name,
-        text_encoder_model_id,
-        tokenizer_model_id,
-        device,
-        torch_dtype,
-        context_len,
-        overwrite,
-    )
-
-    tokenizer = None
-    if backbone_name == "wan22":
-        _, text_config, _, tokenizer_config = _resolve_configs(
-            model_id=model_id,
-            tokenizer_model_id=tokenizer_model_id,
-        )
-        text_config.resolve()
-        tokenizer_config.resolve()
-        text_encoder = _load_registered_model(
-            text_config.path,
-            "wan_video_text_encoder",
-            torch_dtype=torch_dtype,
-            device=device,
-        ).eval()
-        tokenizer = HuggingfaceTokenizer(
-            name=tokenizer_config.path,
-            seq_len=context_len,
-            clean="whitespace",
-        )
-    elif backbone_name == "cosmos25":
-        from model.backbone.cosmos25.cosmos_video_text_encoder import Cosmos25TextEncoder
-        from model.backbone.cosmos25.loader import (
-            load_cosmos25_text_projection,
-            resolve_cosmos25_dit_path,
-        )
-
-        text_encoder = Cosmos25TextEncoder.from_pretrained(
-            text_encoder_model_id, torch_dtype=torch_dtype, max_length=context_len
-        ).to(device).eval()
-        projection = load_cosmos25_text_projection(
-            resolve_cosmos25_dit_path(model_id),
-            device=device,
-            torch_dtype=torch_dtype,
-        )
-        text_encoder.set_projector(projection)
-    elif backbone_name == "flux2":
-        from transformers import AutoModelForCausalLM, AutoTokenizer
-
-        from model.backbone.flux2.text_encoder import Flux2Qwen3TextEncoder
-
-        qwen_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model_id)
-        qwen = AutoModelForCausalLM.from_pretrained(
-            text_encoder_model_id,
-            torch_dtype=torch_dtype,
-            low_cpu_mem_usage=True,
-        ).eval().requires_grad_(False).to(device)
-        text_encoder = Flux2Qwen3TextEncoder(
-            qwen,
-            qwen_tokenizer,
-            output_layers=backbone_cfg.qwen3_output_layers,
-            max_length=context_len,
-        ).eval()
 
     stats = {
         str(cache_dir): {"new": 0, "overwrite": 0, "skip": 0}
@@ -373,6 +342,75 @@ def main(cfg: DictConfig):
             overwrite,
         )
 
+    # Empty ranks still take part in the collective statistics below.
+    if local_prompts:
+        logger.info(
+            "Preparing text encoder for backbone=%s with text_encoder_model_id=%s "
+            "tokenizer_model_id=%s device=%s dtype=%s context_len=%d overwrite=%s",
+            backbone_name,
+            text_encoder_model_id,
+            tokenizer_model_id,
+            device,
+            torch_dtype,
+            context_len,
+            overwrite,
+        )
+
+        tokenizer = None
+        if backbone_name == "wan22":
+            _, text_config, _, tokenizer_config = _resolve_configs(
+                model_id=model_id,
+                tokenizer_model_id=tokenizer_model_id,
+                text_encoder_path=text_encoder_path,
+            )
+            text_config.resolve()
+            tokenizer_config.resolve()
+            text_encoder = _load_registered_model(
+                text_config.path,
+                "wan_video_text_encoder",
+                torch_dtype=torch_dtype,
+                device=device,
+            ).eval()
+            tokenizer = HuggingfaceTokenizer(
+                name=tokenizer_config.path,
+                seq_len=context_len,
+                clean="whitespace",
+            )
+        elif backbone_name == "cosmos25":
+            from model.backbone.cosmos25.cosmos_video_text_encoder import (
+                Cosmos25TextEncoder,
+            )
+            from model.backbone.cosmos25.loader import (
+                load_cosmos25_text_projection,
+                resolve_cosmos25_dit_path,
+            )
+
+            text_encoder = Cosmos25TextEncoder.from_pretrained(
+                text_encoder_model_id, torch_dtype=torch_dtype, max_length=context_len
+            ).to(device).eval()
+            projection = load_cosmos25_text_projection(
+                resolve_cosmos25_dit_path(model_id),
+                device=device,
+                torch_dtype=torch_dtype,
+            )
+            text_encoder.set_projector(projection)
+        elif backbone_name == "flux2":
+            from model.backbone.flux2.text_encoder import Flux2Qwen3TextEncoder
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+
+            qwen_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model_id)
+            qwen = AutoModelForCausalLM.from_pretrained(
+                text_encoder_model_id,
+                torch_dtype=torch_dtype,
+                low_cpu_mem_usage=True,
+            ).eval().requires_grad_(False).to(device)
+            text_encoder = Flux2Qwen3TextEncoder(
+                qwen,
+                qwen_tokenizer,
+                output_layers=backbone_cfg.qwen3_output_layers,
+                max_length=context_len,
+            ).eval()
+
     over_length_prompts = 0
     with tqdm(
         total=len(local_prompts),
@@ -380,50 +418,49 @@ def main(cfg: DictConfig):
         unit="prompt",
         dynamic_ncols=True,
         disable=is_distributed and rank != 0,
-    ) as pbar:
-        with torch.no_grad():
-            encode_batch_size = 1 if backbone_name in {"cosmos25", "flux2"} else DEFAULT_BATCH_SIZE
-            for start in range(0, len(local_prompts), encode_batch_size):
-                batch_prompts = local_prompts[start : start + encode_batch_size]
-                if tokenizer is None:
-                    if backbone_name == "cosmos25":
-                        context, mask, token_mask = text_encoder(
-                            batch_prompts, return_token_mask=True
-                        )
-                    else:
-                        context, mask = text_encoder(batch_prompts)
-                        token_mask = mask
-                    mask = mask.to(device=device, dtype=torch.bool)
-                else:
-                    ids, mask = tokenizer(batch_prompts, return_mask=True, add_special_tokens=True)
-                    ids = ids.to(device)
-                    mask = mask.to(device=device, dtype=torch.bool)
-                    context = text_encoder(ids, mask)
-                    token_mask = mask
-                over_length_prompts += int(token_mask.all(dim=1).sum().item())
-
-                for i, prompt in enumerate(batch_prompts):
-                    hashed = prompt_hash(prompt)
-                    context_i = context[i].detach().to(device="cpu", dtype=torch.bfloat16).contiguous()
-                    mask_i = mask[i].detach().to(device="cpu", dtype=torch.bool).contiguous()
-                    context_i[~mask_i] = 0
-                    payload = _cache_payload(
-                        context_i, mask_i, context_len, enc_id, hashed
+    ) as pbar, torch.no_grad():
+        encode_batch_size = 1 if backbone_name in {"cosmos25", "flux2"} else DEFAULT_BATCH_SIZE
+        for start in range(0, len(local_prompts), encode_batch_size):
+            batch_prompts = local_prompts[start : start + encode_batch_size]
+            if tokenizer is None:
+                if backbone_name == "cosmos25":
+                    context, mask, token_mask = text_encoder(
+                        batch_prompts, return_token_mask=True
                     )
-                    filename = _cache_filename(hashed, context_len, enc_id)
-                    for cache_dir in cache_dirs:
-                        cache_path = cache_dir / filename
-                        key = str(cache_dir)
-                        if cache_path.exists() and not overwrite:
-                            stats[key]["skip"] += 1
-                            continue
-                        if cache_path.exists():
-                            stats[key]["overwrite"] += 1
-                        else:
-                            stats[key]["new"] += 1
-                        _atomic_torch_save(payload, cache_path)
+                else:
+                    context, mask = text_encoder(batch_prompts)
+                    token_mask = mask
+                mask = mask.to(device=device, dtype=torch.bool)
+            else:
+                ids, mask = tokenizer(batch_prompts, return_mask=True, add_special_tokens=True)
+                ids = ids.to(device)
+                mask = mask.to(device=device, dtype=torch.bool)
+                context = text_encoder(ids, mask)
+                token_mask = mask
+            over_length_prompts += int(token_mask.all(dim=1).sum().item())
 
-                pbar.update(len(batch_prompts))
+            for i, prompt in enumerate(batch_prompts):
+                hashed = prompt_hash(prompt)
+                context_i = context[i].detach().to(device="cpu", dtype=torch.bfloat16).contiguous()
+                mask_i = mask[i].detach().to(device="cpu", dtype=torch.bool).contiguous()
+                context_i[~mask_i] = 0
+                payload = _cache_payload(
+                    context_i, mask_i, context_len, enc_id, hashed
+                )
+                filename = _cache_filename(hashed, context_len, enc_id)
+                for cache_dir in cache_dirs:
+                    cache_path = cache_dir / filename
+                    key = str(cache_dir)
+                    if cache_path.exists() and not overwrite:
+                        stats[key]["skip"] += 1
+                        continue
+                    if cache_path.exists():
+                        stats[key]["overwrite"] += 1
+                    else:
+                        stats[key]["new"] += 1
+                    _atomic_torch_save(payload, cache_path)
+
+            pbar.update(len(batch_prompts))
 
     over_length_global = over_length_prompts
     if is_distributed:

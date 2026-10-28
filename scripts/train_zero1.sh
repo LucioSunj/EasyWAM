@@ -38,14 +38,17 @@ if ! [[ "${MAIN_PROCESS_PORT}" =~ ^[0-9]+$ ]] || (( MAIN_PROCESS_PORT < 1 || MAI
 fi
 
 TASK_BASENAME="train"
+OUTPUT_DIR_OVERRIDE=""
 for arg in "${EXTRA_ARGS[@]}"; do
   if [[ "${arg}" == task=* ]]; then
     TASK_BASENAME="${arg#task=}"
     TASK_BASENAME="${TASK_BASENAME%.yaml}"
+  elif [[ "${arg}" == output_dir=* ]]; then
+    OUTPUT_DIR_OVERRIDE="${arg#output_dir=}"
   fi
 done
 
-TRAIN_OUTPUT_DIR="./runs/${TASK_BASENAME}/${RUN_ID}"
+TRAIN_OUTPUT_DIR="${OUTPUT_DIR_OVERRIDE:-./runs/${TASK_BASENAME}/${RUN_ID}}"
 mkdir -p "${TRAIN_OUTPUT_DIR}"
 if (( NUM_MACHINES > 1 )); then
   TRAIN_LOG_PATH="${TRAIN_OUTPUT_DIR}/train_node_${MACHINE_RANK}.log"
